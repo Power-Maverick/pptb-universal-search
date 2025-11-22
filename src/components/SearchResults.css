@@ -1,0 +1,221 @@
+/* Enhanced Search Results with Tabs and Data Grid */
+.search-results .results-header {
+  display: block;
+}
+
+.search-results .results-summary {
+  margin-top: 8px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.error-results {
+  padding: 16px;
+  background: #fef6f6;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.error-item {
+  color: var(--error-color);
+  margin-bottom: 8px;
+}
+
+.error-item:last-child {
+  margin-bottom: 0;
+}
+
+/* Enhanced Tabs */
+.search-results .results-tabs {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  background: none;
+  border-bottom: none;
+}
+
+.search-results .tab-headers {
+  display: flex;
+  background: var(--background-color);
+  border-bottom: 1px solid var(--border-color);
+  overflow-x: auto;
+}
+
+.search-results .tab-header {
+  background: var(--background-color);
+  border: none;
+  padding: 12px 16px;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--text-color);
+  transition: all 0.2s ease;
+}
+
+.search-results .tab-header:hover {
+  background: #f8f8f8;
+}
+
+.search-results .tab-header.active {
+  background: var(--panel-background);
+  border-bottom-color: var(--primary-color);
+  color: var(--primary-color);
+  font-weight: 600;
+}
+
+.search-results .tab-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--panel-background);
+}
+
+.search-results .tab-info {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+  background: #f8f9fa;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.search-results .sort-info {
+  font-style: italic;
+}
+
+/* Enhanced Data Grid */
+.search-results .data-grid-container {
+  flex: 1;
+  overflow: auto;
+  border: 1px solid var(--border-color);
+  border-top: none;
+}
+
+.search-results .data-grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  background: var(--panel-background);
+}
+
+.search-results .data-grid th {
+  background: #f8f9fa;
+  padding: 8px 12px;
+  text-align: left;
+  font-weight: 600;
+  border-bottom: 2px solid var(--border-color);
+  border-right: 1px solid var(--border-color);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.search-results .data-grid th:last-child {
+  border-right: none;
+}
+
+.search-results .data-grid th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.search-results .data-grid th.sortable:hover {
+  background: #e9ecef;
+}
+
+.search-results .header-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.search-results .sort-indicator {
+  color: var(--text-muted);
+  font-weight: normal;
+  opacity: 0.6;
+}
+
+.search-results .data-grid th.sorted-asc .sort-indicator,
+.search-results .data-grid th.sorted-desc .sort-indicator {
+  color: var(--primary-color);
+  opacity: 1;
+  font-weight: bold;
+}
+
+.search-results .data-grid td {
+  padding: 8px 12px;
+  border-bottom: 1px solid #eee;
+  border-right: 1px solid #eee;
+  vertical-align: top;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-results .data-grid td:last-child {
+  border-right: none;
+}
+
+.search-results .data-row:hover {
+  background: #f8f9fa;
+}
+
+.search-results .data-row:nth-child(even) {
+  background: #fdfdfd;
+}
+
+.search-results .data-row:nth-child(even):hover {
+  background: #f8f9fa;
+}
+
+/* Enhanced Cell value formatting */
+.search-results .search-highlight {
+  background: var(--highlight-color);
+  padding: 1px 2px;
+  border-radius: 2px;
+  font-weight: bold;
+}
+
+.search-results .null-value {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.search-results .boolean-value {
+  font-weight: 600;
+}
+
+.search-results .boolean-value.true {
+  color: var(--success-color);
+}
+
+.search-results .boolean-value.false {
+  color: var(--error-color);
+}
+
+.search-results .date-value {
+  color: var(--text-color);
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+}
+
+.search-results .object-value {
+  color: var(--text-muted);
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.search-results .no-records {
+  padding: 40px;
+  text-align: center;
+  color: var(--text-muted);
+  font-style: italic;
+}
