@@ -313,6 +313,80 @@ export class UniversalSearchService {
                     }
                 }
 
+                // Search relationships
+                if (searchOptions.searchRelationships) {
+                    try {
+                        const relationshipsResponse = await window.dataverseAPI.getEntityRelatedMetadata(entityName, 'OneToManyRelationships');
+                        if (relationshipsResponse?.value && Array.isArray(relationshipsResponse.value)) {
+                            this.searchRelationshipMetadata(entityName, relationshipsResponse.value, 'OneToMany', searchRegex, metadataResults);
+                        }
+
+                        const manyToOneResponse = await window.dataverseAPI.getEntityRelatedMetadata(entityName, 'ManyToOneRelationships');
+                        if (manyToOneResponse?.value && Array.isArray(manyToOneResponse.value)) {
+                            this.searchRelationshipMetadata(entityName, manyToOneResponse.value, 'ManyToOne', searchRegex, metadataResults);
+                        }
+
+                        const manyToManyResponse = await window.dataverseAPI.getEntityRelatedMetadata(entityName, 'ManyToManyRelationships');
+                        if (manyToManyResponse?.value && Array.isArray(manyToManyResponse.value)) {
+                            this.searchRelationshipMetadata(entityName, manyToManyResponse.value, 'ManyToMany', searchRegex, metadataResults);
+                        }
+                    } catch (relError) {
+                        console.warn(`Could not get relationships for ${entityName}:`, relError);
+                    }
+                }
+
+                // Search forms and views
+                if (searchOptions.searchFormsViews) {
+                    try {
+                        // Search forms using FetchXML
+                        try {
+                            const formsFetch = `
+                                <fetch>
+                                    <entity name="systemform">
+                                        <attribute name="name" />
+                                        <attribute name="formxml" />
+                                        <filter>
+                                            <condition attribute="objecttypecode" operator="eq" value="${entityMetadata.ObjectTypeCode}" />
+                                        </filter>
+                                    </entity>
+                                </fetch>`;
+                            
+                            const formsResponse = await window.dataverseAPI.fetchXmlQuery(formsFetch);
+                            
+                            if (formsResponse?.value) {
+                                this.searchFormsMetadata(entityName, formsResponse.value, searchRegex, metadataResults);
+                            }
+                        } catch (formsError) {
+                            console.warn(`Could not get forms for ${entityName}:`, formsError);
+                        }
+
+                        // Search saved queries (views) using FetchXML
+                        try {
+                            const viewsFetch = `
+                                <fetch>
+                                    <entity name="savedquery">
+                                        <attribute name="name" />
+                                        <attribute name="fetchxml" />
+                                        <attribute name="layoutxml" />
+                                        <filter>
+                                            <condition attribute="returnedtypecode" operator="eq" value="${entityMetadata.ObjectTypeCode}" />
+                                        </filter>
+                                    </entity>
+                                </fetch>`;
+                            
+                            const viewsResponse = await window.dataverseAPI.fetchXmlQuery(viewsFetch);
+                            
+                            if (viewsResponse?.value) {
+                                this.searchViewsMetadata(entityName, viewsResponse.value, searchRegex, metadataResults);
+                            }
+                        } catch (viewsError) {
+                            console.warn(`Could not get views for ${entityName}:`, viewsError);
+                        }
+                    } catch (formsViewsError) {
+                        console.warn(`Could not get forms/views for ${entityName}:`, formsViewsError);
+                    }
+                }
+
             } catch (error) {
                 console.error(`Error searching metadata for ${entityName}:`, error);
             }
@@ -867,6 +941,170 @@ export class UniversalSearchService {
                 });
             }
         }
+    }
+
+    /**
+     * Search relationship metadata
+     */
+    private searchRelationshipMetadata(
+        entityName: string,
+        relationships: any[],
+        relationshipType: 'OneToMany' | 'ManyToOne' | 'ManyToMany',
+        searchRegex: RegExp,
+        results: MetadataSearchResult[]
+    ) {
+        for (const rel of relationships) {
+            if (!rel || !rel.SchemaName) {
+                continue;
+            }
+            
+            const schemaName = rel.SchemaName;
+            const referencedEntity = rel.ReferencedEntity || rel.Entity1LogicalName || rel.Entity2LogicalName;
+            const referencingEntity = rel.ReferencingEntity || entityName;
+            
+            if (searchRegex.test(schemaName)) {
+                results.push({
+                    entityName,
+                    type: 'relationship',
+                    name: schemaName,
+                    displayName: `${relationshipType}: ${referencingEntity} -> ${referencedEntity}`,
+                    description: `${relationshipType} relationship`,
+                    matchLocation: 'Schema Name',
+                    matchValue: schemaName
+                });
+            }
+            
+            if (referencedEntity && searchRegex.test(referencedEntity)) {
+                results.push({
+                    entityName,
+                    type: 'relationship',
+                    name: schemaName,
+                    displayName: `${relationshipType}: ${referencingEntity} -> ${referencedEntity}`,
+                    description: `${relationshipType} relationship`,
+                    matchLocation: 'Referenced Entity',
+                    matchValue: referencedEntity
+                });
+            }
+        }
+    }
+
+    /**
+     * Search forms metadata
+     */
+    private searchFormsMetadata(
+        entityName: string,
+        forms: any[],
+        searchRegex: RegExp,
+        results: MetadataSearchResult[]
+    ) {
+        for (const form of forms) {
+            if (!form) continue;
+            
+            const formName = form.name;
+            const formXml = form.formxml;
+            
+            if (formName && searchRegex.test(formName)) {
+                results.push({
+                    entityName,
+                    type: 'form',
+                    name: formName,
+                    displayName: formName,
+                    description: 'System Form',
+                    matchLocation: 'Form Name',
+                    matchValue: formName
+                });
+            }
+            
+            if (formXml && searchRegex.test(formXml)) {
+                // Extract a brief snippet for display
+                const match = formXml.match(searchRegex);
+                const snippet = match ? this.extractSnippet(formXml, match.index || 0) : 'Form XML';
+                
+                results.push({
+                    entityName,
+                    type: 'form',
+                    name: formName || 'Unknown Form',
+                    displayName: formName || 'Unknown Form',
+                    description: 'System Form XML',
+                    matchLocation: 'Form XML',
+                    matchValue: snippet
+                });
+            }
+        }
+    }
+
+    /**
+     * Search views metadata  
+     */
+    private searchViewsMetadata(
+        entityName: string,
+        views: any[],
+        searchRegex: RegExp,
+        results: MetadataSearchResult[]
+    ) {
+        for (const view of views) {
+            if (!view) continue;
+            
+            const viewName = view.name;
+            const fetchXml = view.fetchxml;
+            const layoutXml = view.layoutxml;
+            
+            if (viewName && searchRegex.test(viewName)) {
+                results.push({
+                    entityName,
+                    type: 'view',
+                    name: viewName,
+                    displayName: viewName,
+                    description: 'Saved Query (View)',
+                    matchLocation: 'View Name',
+                    matchValue: viewName
+                });
+            }
+            
+            if (fetchXml && searchRegex.test(fetchXml)) {
+                const match = fetchXml.match(searchRegex);
+                const snippet = match ? this.extractSnippet(fetchXml, match.index || 0) : 'FetchXML';
+                
+                results.push({
+                    entityName,
+                    type: 'view',
+                    name: viewName || 'Unknown View',
+                    displayName: viewName || 'Unknown View', 
+                    description: 'View FetchXML',
+                    matchLocation: 'FetchXML',
+                    matchValue: snippet
+                });
+            }
+            
+            if (layoutXml && searchRegex.test(layoutXml)) {
+                const match = layoutXml.match(searchRegex);
+                const snippet = match ? this.extractSnippet(layoutXml, match.index || 0) : 'LayoutXML';
+                
+                results.push({
+                    entityName,
+                    type: 'view',
+                    name: viewName || 'Unknown View',
+                    displayName: viewName || 'Unknown View',
+                    description: 'View LayoutXML',
+                    matchLocation: 'LayoutXML', 
+                    matchValue: snippet
+                });
+            }
+        }
+    }
+
+    /**
+     * Extract a snippet around a match for display
+     */
+    private extractSnippet(text: string, matchIndex: number, contextLength: number = 50): string {
+        const start = Math.max(0, matchIndex - contextLength);
+        const end = Math.min(text.length, matchIndex + contextLength);
+        let snippet = text.substring(start, end);
+        
+        if (start > 0) snippet = '...' + snippet;
+        if (end < text.length) snippet = snippet + '...';
+        
+        return snippet.trim();
     }
 
     /**

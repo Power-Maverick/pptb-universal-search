@@ -1,0 +1,231 @@
+.search-controls-panel {
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 12px;
+}
+
+.search-input-section {
+    margin-bottom: 12px;
+}
+
+.search-input-group {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.search-input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    background: var(--color-input-bg, #ffffff);
+    color: var(--color-text);
+    font-size: 14px;
+    transition: border-color 0.2s ease;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: var(--color-primary, #0078d4);
+    box-shadow: 0 0 0 1px rgba(0, 120, 212, 0.2);
+}
+
+.search-input:disabled {
+    background: var(--color-disabled-bg, #f5f5f5);
+    color: var(--color-disabled-text, #999999);
+    cursor: not-allowed;
+}
+
+.search-button {
+    padding: 8px 16px;
+    background: var(--color-primary, #0078d4);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    white-space: nowrap;
+}
+
+.search-button:hover:not(:disabled) {
+    background: var(--color-primary-hover, #106ebe);
+}
+
+.search-button:disabled {
+    background: var(--color-disabled-bg, #cccccc);
+    cursor: not-allowed;
+}
+
+/* Search Mode Tabs - Compact Design */
+.search-mode-tabs {
+    border-top: 1px solid var(--color-border);
+    padding-top: 8px;
+}
+
+.tabs-and-options {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+
+.tab-headers {
+    display: flex;
+    border-bottom: none;
+    margin-bottom: 0;
+    flex-shrink: 0;
+}
+
+.tab-header {
+    padding: 6px 12px;
+    background: transparent;
+    border: 1px solid var(--color-border);
+    border-bottom: 1px solid var(--color-primary, #0078d4);
+    color: var(--color-text-secondary, #666666);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-radius: 4px 4px 0 0;
+    margin-right: 2px;
+}
+
+.tab-header:hover:not(:disabled) {
+    color: var(--color-text);
+    background: var(--color-hover-bg, rgba(0, 120, 212, 0.1));
+}
+
+.tab-header.active {
+    color: var(--color-primary, #0078d4);
+    background: var(--color-bg);
+    border-bottom-color: var(--color-bg);
+    font-weight: 600;
+}
+
+.tab-header:disabled {
+    color: var(--color-disabled-text, #cccccc);
+    cursor: not-allowed;
+}
+
+.tab-content {
+    flex: 1;
+    min-height: 32px;
+}
+
+/* Search Options - Compact Inline Design */
+.search-options {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.search-options h4 {
+    margin: 0;
+    color: var(--color-text);
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.options-grid {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.option-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--color-text);
+    font-size: 12px;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 3px;
+    transition: background-color 0.2s ease;
+    white-space: nowrap;
+}
+
+.option-item:hover {
+    background: var(--color-hover-bg, rgba(0, 120, 212, 0.05));
+}
+
+.option-item input[type="checkbox"] {
+    margin: 0;
+    cursor: pointer;
+    width: 14px;
+    height: 14px;
+    accent-color: var(--color-primary, #0078d4);
+}
+
+.option-item input[type="checkbox"]:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.info-text {
+    color: var(--color-text-secondary, #666666);
+    font-size: 11px;
+    font-style: italic;
+    padding: 2px 6px;
+    background: var(--color-hover-bg, rgba(0, 120, 212, 0.05));
+    border-radius: 3px;
+    border-left: 2px solid var(--color-primary, #0078d4);
+    white-space: nowrap;
+}
+
+/* Dark theme adjustments */
+[data-theme="dark"] .search-input {
+    background: var(--color-input-bg, #2d2d30);
+    border-color: var(--color-border, #464647);
+}
+
+[data-theme="dark"] .search-input:disabled {
+    background: var(--color-disabled-bg, #3e3e42);
+    color: var(--color-disabled-text, #858585);
+}
+
+[data-theme="dark"] .search-button:disabled {
+    background: var(--color-disabled-bg, #464647);
+}
+
+[data-theme="dark"] .tab-header:disabled {
+    color: var(--color-disabled-text, #666666);
+}
+
+/* Responsive design - more compact on mobile */
+@media (max-width: 768px) {
+    .tabs-and-options {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .tab-headers {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .search-options {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    
+    .options-grid {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+    }
+    
+    .info-text {
+        align-self: stretch;
+        text-align: center;
+    }
+}

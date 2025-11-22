@@ -259,32 +259,9 @@ export function SearchResults({ results, searchText, isSearching }: SearchResult
             // Construct the record URL
             const baseUrl = connection.url.replace(/\/$/, ''); // Remove trailing slash
             const recordUrl = `${baseUrl}/main.aspx?etn=${entityName}&id=${entityId}&pagetype=entityrecord`;
-            
-            // Try to open the record using PPTB API first (if available)
+             
             try {
-                const toolboxUtils = window.toolboxAPI.utils as any;
-                if (toolboxUtils.openRecord) {
-                    await toolboxUtils.openRecord({
-                        entityName: entityName,
-                        entityId: entityId
-                    });
-                    return; // Successfully opened via API
-                } else if (toolboxUtils.openUrl) {
-                    await toolboxUtils.openUrl(recordUrl);
-                    await window.toolboxAPI.utils.showNotification({
-                        title: 'Record Opened',
-                        body: 'Record opened via PPTB API.',
-                        type: 'success'
-                    });
-                    return;
-                }
-            } catch (apiError) {
-                console.warn('PPTB API failed, falling back to window.open:', apiError);
-            }
-            
-            // Fallback: open in new browser window/tab
-            try {
-                const newWindow = window.open(recordUrl, '_blank', 'noopener,noreferrer');
+                const newWindow = window.open(recordUrl, '_blank');
                 if (newWindow) {
                     await window.toolboxAPI.utils.showNotification({
                         title: 'Record Opened',
@@ -305,7 +282,6 @@ export function SearchResults({ results, searchText, isSearching }: SearchResult
                     type: 'warning'
                 });
             }
-            
         } catch (error) {
             console.error('Error opening record:', error);
             await window.toolboxAPI.utils.showNotification({

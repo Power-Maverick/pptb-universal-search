@@ -6,10 +6,6 @@ export interface SearchOptions {
     // Common options
     matchCase: boolean;
     
-    // Record search options
-    searchOptionSetText: boolean;
-    searchLookupText: boolean;
-    
     // Metadata search options
     searchAttributes: boolean;
     searchEntities: boolean;

@@ -14,8 +14,6 @@ function App() {
     const [searchService] = useState(() => new UniversalSearchService());
     const [searchOptions, setSearchOptions] = useState<SearchOptions>({
         matchCase: false,
-        searchOptionSetText: true,
-        searchLookupText: true,
         searchAttributes: true,
         searchEntities: true,
         searchRelationships: false,
