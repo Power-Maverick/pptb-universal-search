@@ -20,6 +20,26 @@ export interface SearchOptions {
     alwaysGetLatestSolution: boolean;
 }
 
+export interface SearchProgress {
+    currentEntity: string;
+    entitiesCompleted: number;
+    totalEntities: number;
+    estimatedTimeRemaining?: number;
+    isSearching: boolean;
+}
+
+export interface SearchCallbacks {
+    onProgress?: (progress: SearchProgress) => void;
+    onResultUpdate?: (result: SearchResult) => void;
+    onComplete?: (allResults: SearchResult[]) => void;
+    onError?: (error: Error) => void;
+}
+
+export interface SearchCancellation {
+    isCancelled: boolean;
+    cancel: () => void;
+}
+
 export interface SearchResult {
     id: string;
     entityName: string;

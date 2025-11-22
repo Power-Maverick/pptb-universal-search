@@ -1,8 +1,48 @@
-import { SearchOptions, SearchResult, SearchMode, AttributeMetadata, MetadataSearchResult } from '../types/search';
+import { SearchOptions, SearchResult, SearchMode, AttributeMetadata, MetadataSearchResult, SearchCallbacks, SearchProgress, SearchCancellation } from '../types/search';
 
 export class UniversalSearchService {
+    private searchStartTime: number = 0;
+    
     /**
-     * Main search function that delegates to specific search methods
+     * Main progressive search function with callbacks
+     */
+    async searchProgressive(
+        searchText: string,
+        searchMode: SearchMode,
+        selectedEntities: string[],
+        selectedSolution: string | null,
+        searchOptions: SearchOptions,
+        callbacks: SearchCallbacks,
+        cancellation: SearchCancellation
+    ): Promise<SearchResult[]> {
+        this.searchStartTime = Date.now();
+        
+        const trimmedText = searchText.trim();
+        if (!trimmedText) {
+            const error = new Error('Search text cannot be empty');
+            callbacks.onError?.(error);
+            throw error;
+        }
+
+        try {
+            switch (searchMode) {
+                case 'records':
+                    return await this.searchRecordsProgressive(trimmedText, selectedEntities, callbacks, cancellation);
+                case 'metadata':
+                    return await this.searchMetadataProgressive(trimmedText, selectedEntities, searchOptions, callbacks, cancellation);
+                case 'solution':
+                    return await this.searchSolutionProgressive(selectedSolution, callbacks, cancellation);
+                default:
+                    throw new Error(`Unsupported search mode: ${searchMode}`);
+            }
+        } catch (error) {
+            callbacks.onError?.(error as Error);
+            throw error;
+        }
+    }
+
+    /**
+     * Original search function for backwards compatibility
      */
     async search(
         searchText: string,
@@ -26,6 +66,367 @@ export class UniversalSearchService {
             default:
                 throw new Error(`Unsupported search mode: ${searchMode}`);
         }
+    }
+
+    /**
+     * Search through records in selected entities with progress callbacks
+     */
+    private async searchRecordsProgressive(
+        searchText: string,
+        selectedEntities: string[],
+        callbacks: SearchCallbacks,
+        cancellation: SearchCancellation
+    ): Promise<SearchResult[]> {
+        if (!selectedEntities || selectedEntities.length === 0) {
+            throw new Error('Please select at least one entity to search');
+        }
+
+        const results: SearchResult[] = [];
+        const sortedEntities = selectedEntities.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+        const totalEntities = sortedEntities.length;
+
+        for (let i = 0; i < sortedEntities.length; i++) {
+            if (cancellation.isCancelled) {
+                break;
+            }
+
+            const entityName = sortedEntities[i];
+            const progress: SearchProgress = {
+                currentEntity: entityName,
+                entitiesCompleted: i,
+                totalEntities,
+                isSearching: true,
+                estimatedTimeRemaining: this.calculateEstimatedTimeRemaining(i, totalEntities)
+            };
+
+            callbacks.onProgress?.(progress);
+
+            try {
+                // Get entity metadata first
+                const entityMetadata = await window.dataverseAPI.getEntityMetadata(entityName, true, ['LogicalName', 'DisplayName']);
+                if (!entityMetadata) {
+                    throw new Error(`Could not retrieve metadata for entity ${entityName}`);
+                }
+                
+                // Get entity attributes using getEntityRelatedMetadata
+                const attributesResponse = await window.dataverseAPI.getEntityRelatedMetadata(entityName, 'Attributes');
+                if (!attributesResponse || !attributesResponse.value) {
+                    console.warn(`No attributes found for entity ${entityName}`);
+                    continue;
+                }
+                
+                const attributes = attributesResponse.value;
+                if (!Array.isArray(attributes)) {
+                    console.warn(`Invalid attributes format for entity ${entityName}`);
+                    continue;
+                }
+                
+                // Filter to searchable attributes
+                const searchableAttributes = (attributes as AttributeMetadata[]).filter(attr => 
+                    attr && 
+                    typeof attr === 'object' &&
+                    'LogicalName' in attr &&
+                    'IsValidForRead' in attr &&
+                    'AttributeType' in attr &&
+                    attr.LogicalName &&
+                    attr.IsValidForRead && 
+                    (attr.AttributeType === 'String' || 
+                     attr.AttributeType === 'Memo' ||
+                     attr.AttributeType === 'Lookup' ||
+                     attr.AttributeType === 'Customer' ||
+                     attr.AttributeType === 'Owner' ||
+                     attr.AttributeType === 'Picklist' ||
+                     attr.AttributeType === 'State' ||
+                     attr.AttributeType === 'Status' ||
+                     attr.AttributeType === 'Integer' ||
+                     attr.AttributeType === 'BigInt' ||
+                     attr.AttributeType === 'Decimal' ||
+                     attr.AttributeType === 'Double' ||
+                     attr.AttributeType === 'Money' ||
+                     attr.AttributeType === 'DateTime' ||
+                     attr.AttributeType === 'Boolean' ||
+                     attr.AttributeType === 'Uniqueidentifier')
+                );
+
+                if (searchableAttributes.length === 0) {
+                    console.warn(`No searchable attributes found for entity ${entityName}`);
+                    // Just continue to next entity - don't create error result for UI
+                    continue;
+                }
+
+                // Build FetchXML query
+                let fetchXml: string;
+                try {
+                    fetchXml = this.buildRecordSearchFetchXml(
+                        entityName,
+                        searchText,
+                        searchableAttributes
+                    );
+                } catch (fetchError) {
+                    console.warn(`Could not build search query for entity ${entityName}:`, fetchError);
+                    // Just continue to next entity - don't create error result for UI
+                    continue;
+                }
+
+                // Execute query
+                let response: any;
+                try {
+                    response = await window.dataverseAPI.fetchXmlQuery(fetchXml);
+                } catch (queryError) {
+                    console.warn(`Query failed for entity ${entityName}:`, queryError);
+                    // Track error for final summary but don't create UI result
+                    const errorResult: SearchResult = {
+                        id: `records_${entityName}_fetch_error`,
+                        entityName,
+                        tabTitle: `${entityName} (Fetch Error)`,
+                        type: 'records',
+                        records: [],
+                        totalCount: 0,
+                        error: `Failed to execute query for ${entityName}: ${(queryError as Error).message}`
+                    };
+                    
+                    results.push(errorResult);
+                    // Don't call onResultUpdate for errors - just track in results for final summary
+                    continue;
+                }
+                
+                let records = response?.value || [];
+
+                if (!Array.isArray(records)) {
+                    console.warn(`Invalid response format for entity ${entityName}:`, response);
+                    records = [];
+                }
+
+                // Post-process results
+                records = await this.postProcessRecords(records);
+
+                // Only create result if we have records or want to show empty results
+                if (records.length > 0) {
+                    const recordsWithId = records.map((record: any, index: number) => ({
+                        ...record,
+                        id: record.id || record[`${entityName}id`] || `record_${index}`
+                    }));
+                    
+                    const result: SearchResult = {
+                        id: `records_${entityName}`,
+                        entityName,
+                        tabTitle: `${entityMetadata.DisplayName?.LocalizedLabels?.[0]?.Label || entityName} (${records.length})`,
+                        type: 'records',
+                        records: recordsWithId,
+                        totalCount: records.length
+                    };
+                    
+                    results.push(result);
+                    callbacks.onResultUpdate?.(result);
+                }
+
+            } catch (error) {
+                console.error(`Error searching entity ${entityName}:`, error);
+                // Track error for final summary but don't create UI result
+                const errorResult: SearchResult = {
+                    id: `records_${entityName}_error`,
+                    entityName,
+                    tabTitle: `${entityName} (Error)`,
+                    type: 'records',
+                    records: [],
+                    totalCount: 0,
+                    error: `Failed to search ${entityName}: ${(error as Error).message}`
+                };
+                
+                results.push(errorResult);
+                // Don't call onResultUpdate for errors - just track in results for final summary
+            }
+        }
+
+        const finalProgress: SearchProgress = {
+            currentEntity: '',
+            entitiesCompleted: totalEntities,
+            totalEntities,
+            isSearching: false
+        };
+        
+        callbacks.onProgress?.(finalProgress);
+        callbacks.onComplete?.(results);
+
+        return results;
+    }
+
+    /**
+     * Search through metadata with progress callbacks
+     */
+    private async searchMetadataProgressive(
+        searchText: string,
+        selectedEntities: string[],
+        searchOptions: SearchOptions,
+        callbacks: SearchCallbacks,
+        cancellation: SearchCancellation
+    ): Promise<SearchResult[]> {
+        const results: SearchResult[] = [];
+        const searchRegex = this.wildcardToRegex(searchText, searchOptions.matchCase);
+        
+        // Get entities to search
+        let entitiesToSearch = selectedEntities;
+        if (!selectedEntities || selectedEntities.length === 0) {
+            const allEntities = await window.dataverseAPI.getAllEntitiesMetadata();
+            entitiesToSearch = (allEntities?.value || []).map((e: any) => e.LogicalName).filter(Boolean);
+        }
+
+        const metadataResults: MetadataSearchResult[] = [];
+        const totalEntities = entitiesToSearch.length;
+
+        for (let i = 0; i < entitiesToSearch.length; i++) {
+            if (cancellation.isCancelled) {
+                break;
+            }
+
+            const entityName = entitiesToSearch[i];
+            const progress: SearchProgress = {
+                currentEntity: entityName,
+                entitiesCompleted: i,
+                totalEntities,
+                isSearching: true,
+                estimatedTimeRemaining: this.calculateEstimatedTimeRemaining(i, totalEntities)
+            };
+
+            callbacks.onProgress?.(progress);
+
+            try {
+                const entityMetadata = await window.dataverseAPI.getEntityMetadata(entityName, false);
+                if (!entityMetadata) {
+                    continue;
+                }
+                
+                // Search entity names and descriptions
+                if (searchOptions.searchEntities) {
+                    this.searchEntityMetadata(entityMetadata, searchRegex, metadataResults);
+                }
+
+                // Search attributes
+                if (searchOptions.searchAttributes) {
+                    try {
+                        const attributesResponse = await window.dataverseAPI.getEntityRelatedMetadata(entityName, 'Attributes');
+                        if (attributesResponse?.value && Array.isArray(attributesResponse.value)) {
+                            this.searchAttributeMetadata(entityName, attributesResponse.value, searchRegex, metadataResults);
+                        }
+                    } catch (attrError) {
+                        console.warn(`Could not get attributes for ${entityName}:`, attrError);
+                    }
+                }
+
+            } catch (error) {
+                console.error(`Error searching metadata for ${entityName}:`, error);
+            }
+        }
+
+        // Group and convert results
+        if (metadataResults.length > 0) {
+            const groupedResults = metadataResults.reduce((acc, result) => {
+                if (!acc[result.entityName]) {
+                    acc[result.entityName] = [];
+                }
+                acc[result.entityName].push(result);
+                return acc;
+            }, {} as Record<string, MetadataSearchResult[]>);
+
+            for (const [entityName, entityResults] of Object.entries(groupedResults)) {
+                const result: SearchResult = {
+                    id: `metadata_${entityName}`,
+                    entityName,
+                    tabTitle: `${entityName} Metadata (${entityResults.length})`,
+                    type: 'metadata',
+                    records: entityResults.map(r => ({
+                        id: `${r.type}_${r.name}`,
+                        Type: r.type,
+                        Name: r.name,
+                        'Display Name': r.displayName || '',
+                        'Match Location': r.matchLocation,
+                        'Match Value': r.matchValue,
+                        Description: r.description || ''
+                    })),
+                    totalCount: entityResults.length
+                };
+                
+                results.push(result);
+                callbacks.onResultUpdate?.(result);
+            }
+        }
+
+        const finalProgress: SearchProgress = {
+            currentEntity: '',
+            entitiesCompleted: totalEntities,
+            totalEntities,
+            isSearching: false
+        };
+        
+        callbacks.onProgress?.(finalProgress);
+        callbacks.onComplete?.(results);
+
+        return results;
+    }
+
+    /**
+     * Search through solution with progress callbacks
+     */
+    private async searchSolutionProgressive(
+        selectedSolution: string | null,
+        callbacks: SearchCallbacks,
+        cancellation: SearchCancellation
+    ): Promise<SearchResult[]> {
+        if (!selectedSolution) {
+            throw new Error('Please select a solution to search');
+        }
+
+        if (cancellation.isCancelled) {
+            return [];
+        }
+
+        const progress: SearchProgress = {
+            currentEntity: selectedSolution,
+            entitiesCompleted: 0,
+            totalEntities: 1,
+            isSearching: true
+        };
+
+        callbacks.onProgress?.(progress);
+
+        const result: SearchResult = {
+            id: `solution_${selectedSolution}`,
+            entityName: selectedSolution,
+            tabTitle: `${selectedSolution} (Not Implemented)`,
+            type: 'solution',
+            records: [],
+            totalCount: 0,
+            error: 'Solution file search is not yet implemented in this version. This feature requires server-side solution export and file parsing capabilities.'
+        };
+
+        callbacks.onResultUpdate?.(result);
+
+        const finalProgress: SearchProgress = {
+            currentEntity: '',
+            entitiesCompleted: 1,
+            totalEntities: 1,
+            isSearching: false
+        };
+
+        callbacks.onProgress?.(finalProgress);
+        callbacks.onComplete?.([result]);
+
+        return [result];
+    }
+
+    /**
+     * Calculate estimated time remaining based on current progress
+     */
+    private calculateEstimatedTimeRemaining(completed: number, total: number): number | undefined {
+        if (completed === 0 || this.searchStartTime === 0) {
+            return undefined;
+        }
+
+        const elapsedTime = (Date.now() - this.searchStartTime) / 1000; // in seconds
+        const averageTimePerEntity = elapsedTime / completed;
+        const remainingEntities = total - completed;
+        
+        return Math.round(averageTimePerEntity * remainingEntities);
     }
 
     /**
@@ -62,7 +463,7 @@ export class UniversalSearchService {
                     continue;
                 }
                 
-                // Filter to searchable attributes - include all types from C# version
+                // Filter to searchable attributes - include all types
                 const searchableAttributes = (attributes as AttributeMetadata[]).filter(attr => 
                     attr && 
                     typeof attr === 'object' &&
@@ -71,7 +472,7 @@ export class UniversalSearchService {
                     'AttributeType' in attr &&
                     attr.LogicalName &&
                     attr.IsValidForRead && 
-                    // Include all attribute types that C# version searches
+                    // Include all attribute types that the search supports
                     (attr.AttributeType === 'String' || 
                      attr.AttributeType === 'Memo' ||
                      attr.AttributeType === 'Lookup' ||

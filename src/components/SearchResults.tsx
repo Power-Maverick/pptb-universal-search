@@ -197,6 +197,125 @@ export function SearchResults({ results, searchText, isSearching }: SearchResult
         return highlightSearchText(String(value), searchTerm);
     };
 
+    // Function to handle row click and open record in Dataverse
+    const handleRowClick = async (record: any) => {
+        if (!activeResult) return;
+        
+        try {
+            // Try to find the entity ID in various possible fields
+            const entityName = activeResult.entityName;
+            const primaryIdField = `${entityName}id`;
+            
+            let entityId = record.id || record[primaryIdField] || record[`${entityName}_id`];
+            
+            // If we still don't have an ID, try to find any field ending with 'id'
+            if (!entityId) {
+                const idFields = Object.keys(record).filter(key => 
+                    key.toLowerCase().endsWith('id') && 
+                    record[key] && 
+                    typeof record[key] === 'string' &&
+                    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(record[key])
+                );
+                
+                if (idFields.length > 0) {
+                    entityId = record[idFields[0]];
+                }
+            }
+            
+            if (!entityId) {
+                console.warn('Could not find entity ID for record:', record);
+                await window.toolboxAPI.utils.showNotification({
+                    title: 'Cannot Open Record',
+                    body: 'Could not determine the record ID to open.',
+                    type: 'warning'
+                });
+                return;
+            }
+            
+            // Ensure entityId is a valid GUID
+            const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            if (!guidRegex.test(entityId)) {
+                console.warn('Invalid entity ID format:', entityId);
+                await window.toolboxAPI.utils.showNotification({
+                    title: 'Cannot Open Record',
+                    body: 'Invalid record ID format.',
+                    type: 'warning'
+                });
+                return;
+            }
+            
+            // Open the record using PPTB API
+            // Get the current connection to construct the record URL
+            const connection = await window.toolboxAPI.connections.getActiveConnection();
+            if (!connection || !connection.url) {
+                await window.toolboxAPI.utils.showNotification({
+                    title: 'Cannot Open Record',
+                    body: 'No active Dataverse connection found.',
+                    type: 'warning'
+                });
+                return;
+            }
+            
+            // Construct the record URL
+            const baseUrl = connection.url.replace(/\/$/, ''); // Remove trailing slash
+            const recordUrl = `${baseUrl}/main.aspx?etn=${entityName}&id=${entityId}&pagetype=entityrecord`;
+            
+            // Try to open the record using PPTB API first (if available)
+            try {
+                const toolboxUtils = window.toolboxAPI.utils as any;
+                if (toolboxUtils.openRecord) {
+                    await toolboxUtils.openRecord({
+                        entityName: entityName,
+                        entityId: entityId
+                    });
+                    return; // Successfully opened via API
+                } else if (toolboxUtils.openUrl) {
+                    await toolboxUtils.openUrl(recordUrl);
+                    await window.toolboxAPI.utils.showNotification({
+                        title: 'Record Opened',
+                        body: 'Record opened via PPTB API.',
+                        type: 'success'
+                    });
+                    return;
+                }
+            } catch (apiError) {
+                console.warn('PPTB API failed, falling back to window.open:', apiError);
+            }
+            
+            // Fallback: open in new browser window/tab
+            try {
+                const newWindow = window.open(recordUrl, '_blank', 'noopener,noreferrer');
+                if (newWindow) {
+                    await window.toolboxAPI.utils.showNotification({
+                        title: 'Record Opened',
+                        body: 'Record opened in new browser tab.',
+                        type: 'success'
+                    });
+                } else {
+                    throw new Error('Popup blocked or failed to open window');
+                }
+            } catch (windowError) {
+                console.warn('Failed to open in new window, copying to clipboard:', windowError);
+                
+                // Final fallback: copy to clipboard
+                await window.toolboxAPI.utils.copyToClipboard(recordUrl);
+                await window.toolboxAPI.utils.showNotification({
+                    title: 'Record URL Copied',
+                    body: 'Could not open record directly. URL copied to clipboard - paste in browser to open.',
+                    type: 'warning'
+                });
+            }
+            
+        } catch (error) {
+            console.error('Error opening record:', error);
+            await window.toolboxAPI.utils.showNotification({
+                title: 'Error Opening Record',
+                body: `Failed to open record: ${(error as Error).message}`,
+                type: 'error'
+            });
+        }
+    };
+
     // Helper function to check if a value contains the search term
     const containsSearchTerm = (value: any, searchTerm: string): boolean => {
         if (!searchTerm.trim() || value == null) return false;
@@ -217,29 +336,22 @@ export function SearchResults({ results, searchText, isSearching }: SearchResult
         return regex.test(textToSearch);
     };
 
-    if (isSearching) {
-        return (
-            <div className="search-results">
-                <div className="results-header">
-                    <h3>Search Results</h3>
-                </div>
-                <div className="loading-message">
-                    <div className="spinner"></div>
-                    <span>Searching...</span>
-                </div>
-            </div>
-        );
-    }
-
     if (results.length === 0) {
         return (
             <div className="search-results">
                 <div className="results-header">
                     <h3>Search Results</h3>
                 </div>
-                <div className="no-results">
-                    {searchText ? 'No results found. Try adjusting your search criteria.' : 'Enter a search term and click Search to begin.'}
-                </div>
+                {isSearching ? (
+                    <div className="loading-message">
+                        <div className="spinner"></div>
+                        <span>Searching...</span>
+                    </div>
+                ) : (
+                    <div className="no-results">
+                        {searchText ? 'No results found. Try adjusting your search criteria.' : 'Enter a search term and click Search to begin.'}
+                    </div>
+                )}
             </div>
         );
     }
@@ -252,6 +364,7 @@ export function SearchResults({ results, searchText, isSearching }: SearchResult
                 <h3>Search Results</h3>
                 <div className="results-summary">
                     Found {results.length} result tab{results.length === 1 ? '' : 's'} with {totalRecords} total record{totalRecords === 1 ? '' : 's'}.
+                    {isSearching && <span className="searching-indicator"> (Search in progress...)</span>}
                 </div>
             </div>
             
@@ -320,7 +433,12 @@ export function SearchResults({ results, searchText, isSearching }: SearchResult
                                         </thead>
                                         <tbody>
                                             {sortedRecords.map((record, recordIndex) => (
-                                                <tr key={record.id || recordIndex} className="data-row">
+                                                <tr 
+                                                    key={record.id || recordIndex} 
+                                                    className="data-row clickable-row"
+                                                    onClick={() => handleRowClick(record)}
+                                                    title="Click to open record in Dataverse"
+                                                >
                                                     {columns.map(column => {
                                                         const cellValue = getCellValue(record, column);
                                                         return (
