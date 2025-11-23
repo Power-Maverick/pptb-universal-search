@@ -4,11 +4,13 @@ import { SearchProgress } from '../types/search';
 interface SearchProgressIndicatorProps {
     progress: SearchProgress;
     onCancel: () => void;
+    position?: 'top' | 'bottom';
 }
 
 export const SearchProgressIndicator: React.FC<SearchProgressIndicatorProps> = ({
     progress,
-    onCancel
+    onCancel,
+    position = 'top'
 }) => {
     const progressPercentage = progress.totalEntities > 0 
         ? Math.round((progress.entitiesCompleted / progress.totalEntities) * 100)
@@ -18,14 +20,14 @@ export const SearchProgressIndicator: React.FC<SearchProgressIndicatorProps> = (
         if (!seconds || seconds <= 0) return '';
         
         if (seconds < 60) {
-            return `${Math.round(seconds)}s remaining`;
+            return `${Math.round(seconds)}s left`;
         } else if (seconds < 3600) {
             const minutes = Math.round(seconds / 60);
-            return `${minutes}m remaining`;
+            return `${minutes}m left`;
         } else {
             const hours = Math.floor(seconds / 3600);
             const minutes = Math.round((seconds % 3600) / 60);
-            return `${hours}h ${minutes}m remaining`;
+            return `${hours}h ${minutes}m left`;
         }
     };
 
@@ -34,23 +36,18 @@ export const SearchProgressIndicator: React.FC<SearchProgressIndicatorProps> = (
     }
 
     return (
-        <div className="search-progress-indicator">
-            <div className="progress-header">
-                <div className="progress-info">
-                    <div className="progress-status">
-                        <span className="current-entity">Searching: {progress.currentEntity}</span>
-                        <span className="progress-stats">
-                            {progress.entitiesCompleted} of {progress.totalEntities} entities completed
-                        </span>
-                    </div>
+        <div className={`search-progress-indicator-compact search-progress-${position}`}>
+            <div className="progress-line">
+                <div className="progress-text">
+                    <span className="progress-entity">Searching {progress.currentEntity}</span>
+                    <span className="progress-count">({progress.entitiesCompleted}/{progress.totalEntities})</span>
                     {progress.estimatedTimeRemaining && (
-                        <div className="time-remaining">
-                            {formatTimeRemaining(progress.estimatedTimeRemaining)}
-                        </div>
+                        <span className="progress-time">{formatTimeRemaining(progress.estimatedTimeRemaining)}</span>
                     )}
+                    <span className="progress-percent">{progressPercentage}%</span>
                 </div>
                 <button 
-                    className="cancel-button"
+                    className="progress-cancel-btn"
                     onClick={onCancel}
                     title="Cancel search"
                 >
@@ -58,12 +55,11 @@ export const SearchProgressIndicator: React.FC<SearchProgressIndicatorProps> = (
                 </button>
             </div>
             
-            <div className="progress-bar-container">
+            <div className="progress-bar-compact">
                 <div 
-                    className="progress-bar"
+                    className="progress-bar-fill"
                     style={{ width: `${progressPercentage}%` }}
                 />
-                <span className="progress-percentage">{progressPercentage}%</span>
             </div>
         </div>
     );

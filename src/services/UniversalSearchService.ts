@@ -1,4 +1,5 @@
 import { SearchOptions, SearchResult, SearchMode, AttributeMetadata, MetadataSearchResult, SearchCallbacks, SearchProgress, SearchCancellation } from '../types/search';
+import { metadataCache } from './MetadataCache';
 
 export class UniversalSearchService {
     private searchStartTime: number = 0;
@@ -102,10 +103,21 @@ export class UniversalSearchService {
             callbacks.onProgress?.(progress);
 
             try {
-                // Get entity metadata first
-                const entityMetadata = await window.dataverseAPI.getEntityMetadata(entityName, true, ['LogicalName', 'DisplayName']);
+                // Get entity metadata from cache first, fallback to API if not cached
+                let entityMetadata = metadataCache.getEntityMetadata(entityName);
                 if (!entityMetadata) {
-                    throw new Error(`Could not retrieve metadata for entity ${entityName}`);
+                    // Fallback to API call if not in cache (shouldn't happen in normal flow)
+                    console.warn(`Entity metadata not in cache for ${entityName}, making API call`);
+                    const apiMetadata = await window.dataverseAPI.getEntityMetadata(entityName, true, ['LogicalName', 'DisplayName']);
+                    if (!apiMetadata) {
+                        throw new Error(`Could not retrieve metadata for entity ${entityName}`);
+                    }
+                    entityMetadata = apiMetadata as any; // Type assertion since we know the structure
+                }
+                
+                // At this point entityMetadata is guaranteed to exist
+                if (!entityMetadata) {
+                    throw new Error(`Could not get entity metadata for ${entityName}`);
                 }
                 
                 // Get entity attributes using getEntityRelatedMetadata
@@ -291,14 +303,19 @@ export class UniversalSearchService {
             callbacks.onProgress?.(progress);
 
             try {
-                const entityMetadata = await window.dataverseAPI.getEntityMetadata(entityName, false);
+                // For metadata search, we need complete metadata from API
+                // since cache may not have all the detailed properties needed
+                const entityMetadata = await window.dataverseAPI.getEntityMetadata(entityName, true);
                 if (!entityMetadata) {
                     continue;
                 }
                 
+                // Track results for this specific entity
+                const entityMetadataResults: MetadataSearchResult[] = [];
+                
                 // Search entity names and descriptions
                 if (searchOptions.searchEntities) {
-                    this.searchEntityMetadata(entityMetadata, searchRegex, metadataResults);
+                    this.searchEntityMetadata(entityMetadata, searchRegex, entityMetadataResults);
                 }
 
                 // Search attributes
@@ -306,7 +323,7 @@ export class UniversalSearchService {
                     try {
                         const attributesResponse = await window.dataverseAPI.getEntityRelatedMetadata(entityName, 'Attributes');
                         if (attributesResponse?.value && Array.isArray(attributesResponse.value)) {
-                            this.searchAttributeMetadata(entityName, attributesResponse.value, searchRegex, metadataResults);
+                            this.searchAttributeMetadata(entityName, attributesResponse.value, searchRegex, entityMetadataResults);
                         }
                     } catch (attrError) {
                         console.warn(`Could not get attributes for ${entityName}:`, attrError);
@@ -318,17 +335,17 @@ export class UniversalSearchService {
                     try {
                         const relationshipsResponse = await window.dataverseAPI.getEntityRelatedMetadata(entityName, 'OneToManyRelationships');
                         if (relationshipsResponse?.value && Array.isArray(relationshipsResponse.value)) {
-                            this.searchRelationshipMetadata(entityName, relationshipsResponse.value, 'OneToMany', searchRegex, metadataResults);
+                            this.searchRelationshipMetadata(entityName, relationshipsResponse.value, 'OneToMany', searchRegex, entityMetadataResults);
                         }
 
                         const manyToOneResponse = await window.dataverseAPI.getEntityRelatedMetadata(entityName, 'ManyToOneRelationships');
                         if (manyToOneResponse?.value && Array.isArray(manyToOneResponse.value)) {
-                            this.searchRelationshipMetadata(entityName, manyToOneResponse.value, 'ManyToOne', searchRegex, metadataResults);
+                            this.searchRelationshipMetadata(entityName, manyToOneResponse.value, 'ManyToOne', searchRegex, entityMetadataResults);
                         }
 
                         const manyToManyResponse = await window.dataverseAPI.getEntityRelatedMetadata(entityName, 'ManyToManyRelationships');
                         if (manyToManyResponse?.value && Array.isArray(manyToManyResponse.value)) {
-                            this.searchRelationshipMetadata(entityName, manyToManyResponse.value, 'ManyToMany', searchRegex, metadataResults);
+                            this.searchRelationshipMetadata(entityName, manyToManyResponse.value, 'ManyToMany', searchRegex, entityMetadataResults);
                         }
                     } catch (relError) {
                         console.warn(`Could not get relationships for ${entityName}:`, relError);
@@ -354,7 +371,7 @@ export class UniversalSearchService {
                             const formsResponse = await window.dataverseAPI.fetchXmlQuery(formsFetch);
                             
                             if (formsResponse?.value) {
-                                this.searchFormsMetadata(entityName, formsResponse.value, searchRegex, metadataResults);
+                                this.searchFormsMetadata(entityName, formsResponse.value, searchRegex, entityMetadataResults);
                             }
                         } catch (formsError) {
                             console.warn(`Could not get forms for ${entityName}:`, formsError);
@@ -377,7 +394,7 @@ export class UniversalSearchService {
                             const viewsResponse = await window.dataverseAPI.fetchXmlQuery(viewsFetch);
                             
                             if (viewsResponse?.value) {
-                                this.searchViewsMetadata(entityName, viewsResponse.value, searchRegex, metadataResults);
+                                this.searchViewsMetadata(entityName, viewsResponse.value, searchRegex, entityMetadataResults);
                             }
                         } catch (viewsError) {
                             console.warn(`Could not get views for ${entityName}:`, viewsError);
@@ -387,43 +404,39 @@ export class UniversalSearchService {
                     }
                 }
 
+                // If we found results for this entity, immediately send them to UI
+                if (entityMetadataResults.length > 0) {
+                    // Add to global results
+                    metadataResults.push(...entityMetadataResults);
+                    
+                    // Create and send result immediately for progressive display
+                    const result: SearchResult = {
+                        id: `metadata_${entityName}`,
+                        entityName,
+                        tabTitle: `${entityName} Metadata (${entityMetadataResults.length})`,
+                        type: 'metadata',
+                        records: entityMetadataResults.map(r => ({
+                            id: `${r.type}_${r.name}`,
+                            Type: r.type,
+                            Name: r.name,
+                            'Display Name': r.displayName || '',
+                            'Match Location': r.matchLocation,
+                            'Match Value': r.matchValue,
+                            Description: r.description || ''
+                        })),
+                        totalCount: entityMetadataResults.length
+                    };
+                    
+                    results.push(result);
+                    callbacks.onResultUpdate?.(result);
+                }
+
             } catch (error) {
                 console.error(`Error searching metadata for ${entityName}:`, error);
             }
         }
 
-        // Group and convert results
-        if (metadataResults.length > 0) {
-            const groupedResults = metadataResults.reduce((acc, result) => {
-                if (!acc[result.entityName]) {
-                    acc[result.entityName] = [];
-                }
-                acc[result.entityName].push(result);
-                return acc;
-            }, {} as Record<string, MetadataSearchResult[]>);
-
-            for (const [entityName, entityResults] of Object.entries(groupedResults)) {
-                const result: SearchResult = {
-                    id: `metadata_${entityName}`,
-                    entityName,
-                    tabTitle: `${entityName} Metadata (${entityResults.length})`,
-                    type: 'metadata',
-                    records: entityResults.map(r => ({
-                        id: `${r.type}_${r.name}`,
-                        Type: r.type,
-                        Name: r.name,
-                        'Display Name': r.displayName || '',
-                        'Match Location': r.matchLocation,
-                        'Match Value': r.matchValue,
-                        Description: r.description || ''
-                    })),
-                    totalCount: entityResults.length
-                };
-                
-                results.push(result);
-                callbacks.onResultUpdate?.(result);
-            }
-        }
+        // Final progress update
 
         const finalProgress: SearchProgress = {
             currentEntity: '',
@@ -518,10 +531,21 @@ export class UniversalSearchService {
 
         for (const entityName of selectedEntities.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))) {
             try {
-                // Get entity metadata first
-                const entityMetadata = await window.dataverseAPI.getEntityMetadata(entityName, true, ['LogicalName', 'DisplayName']);
+                // Get entity metadata from cache first, fallback to API if not cached
+                let entityMetadata = metadataCache.getEntityMetadata(entityName);
                 if (!entityMetadata) {
-                    throw new Error(`Could not retrieve metadata for entity ${entityName}`);
+                    // Fallback to API call if not in cache (shouldn't happen in normal flow)
+                    console.warn(`Entity metadata not in cache for ${entityName}, making API call`);
+                    const apiMetadata = await window.dataverseAPI.getEntityMetadata(entityName, true, ['LogicalName', 'DisplayName']);
+                    if (!apiMetadata) {
+                        throw new Error(`Could not retrieve metadata for entity ${entityName}`);
+                    }
+                    entityMetadata = apiMetadata as any;
+                }
+                
+                // At this point entityMetadata is guaranteed to exist
+                if (!entityMetadata) {
+                    throw new Error(`Could not get entity metadata for ${entityName}`);
                 }
                 
                 // Get entity attributes using getEntityRelatedMetadata
@@ -853,56 +877,167 @@ export class UniversalSearchService {
     }
 
     /**
-     * Search entity metadata
+     * Search entity metadata using comprehensive recursive search
      */
     private searchEntityMetadata(
         entityMetadata: any,
         searchRegex: RegExp,
         results: MetadataSearchResult[]
     ) {
-        const entityName = entityMetadata.LogicalName;
-        const displayName = entityMetadata.DisplayName?.UserLocalizedLabel?.Label;
-        const description = entityMetadata.Description?.UserLocalizedLabel?.Label;
-        
-        if (searchRegex.test(entityName)) {
-            results.push({
-                entityName,
-                type: 'entity',
-                name: entityName,
-                displayName,
-                description,
-                matchLocation: 'Logical Name',
-                matchValue: entityName
-            });
+        if (!entityMetadata || !entityMetadata.LogicalName) {
+            return;
         }
-        
-        if (displayName && searchRegex.test(displayName)) {
-            results.push({
-                entityName,
-                type: 'entity',
-                name: entityName,
-                displayName,
-                description,
-                matchLocation: 'Display Name',
-                matchValue: displayName
-            });
+
+        // Use comprehensive recursive search like the C# version
+        this.searchMetadataObjectRecursively(
+            entityMetadata.LogicalName,
+            '',
+            'Entity',
+            entityMetadata,
+            '',
+            searchRegex,
+            results
+        );
+    }
+
+    /**
+     * Recursive metadata search method that mirrors the C# implementation
+     * This searches through all properties of an object, including nested objects and arrays
+     */
+    private searchMetadataObjectRecursively(
+        entityName: string,
+        linkType: string,
+        metadataType: string,
+        searchObject: any,
+        itemIdentifier: string,
+        searchRegex: RegExp,
+        results: MetadataSearchResult[]
+    ) {
+        if (!searchObject) return;
+
+        // Update item identifier based on object type
+        itemIdentifier = this.buildItemIdentifier(searchObject, itemIdentifier);
+
+        // Handle arrays
+        if (Array.isArray(searchObject)) {
+            for (const item of searchObject) {
+                this.searchMetadataObjectRecursively(
+                    entityName,
+                    linkType,
+                    metadataType,
+                    item,
+                    itemIdentifier,
+                    searchRegex,
+                    results
+                );
+            }
+            return;
         }
-        
-        if (description && searchRegex.test(description)) {
-            results.push({
-                entityName,
-                type: 'entity',
-                name: entityName,
-                displayName,
-                description,
-                matchLocation: 'Description',
-                matchValue: description
-            });
+
+        // Handle objects
+        if (typeof searchObject === 'object' && searchObject !== null) {
+            for (const [propertyName, propertyValue] of Object.entries(searchObject)) {
+                // Skip functions and certain system properties
+                if (typeof propertyValue === 'function' || 
+                    propertyName.startsWith('__') ||
+                    propertyName === 'constructor') {
+                    continue;
+                }
+
+                // If property value is an array or object, recurse into it
+                if (Array.isArray(propertyValue) || 
+                    (typeof propertyValue === 'object' && propertyValue !== null)) {
+                    this.searchMetadataObjectRecursively(
+                        entityName,
+                        linkType,
+                        metadataType,
+                        propertyValue,
+                        itemIdentifier,
+                        searchRegex,
+                        results
+                    );
+                } else {
+                    // Search both property name and property value (primitive types)
+                    const propertyValueStr = propertyValue?.toString() || '';
+                    
+                    if (searchRegex.test(propertyName) || 
+                        (propertyValueStr && searchRegex.test(propertyValueStr))) {
+                        
+                        results.push({
+                            entityName,
+                            type: this.mapMetadataType(metadataType),
+                            name: itemIdentifier,
+                            displayName: itemIdentifier,
+                            description: `${propertyName}: ${propertyValueStr}`,
+                            matchLocation: searchRegex.test(propertyName) ? 'Property Name' : 'Property Value',
+                            matchValue: searchRegex.test(propertyName) ? propertyName : propertyValueStr
+                        });
+                    }
+                }
+            }
         }
     }
 
     /**
-     * Search attribute metadata
+     * Build item identifier based on object type (mirrors C# implementation)
+     */
+    private buildItemIdentifier(searchObject: any, currentIdentifier: string): string {
+        if (!searchObject) return currentIdentifier;
+
+        // Handle different metadata object types
+        if (searchObject.LogicalName) {
+            // Entity or Attribute metadata
+            return searchObject.DisplayName?.UserLocalizedLabel?.Label || 
+                   searchObject.DisplayName?.LocalizedLabels?.[0]?.Label || 
+                   searchObject.LogicalName;
+        }
+
+        if (searchObject.SchemaName) {
+            return searchObject.SchemaName;
+        }
+
+        if (searchObject.ReferencedEntity && searchObject.ReferencingEntity) {
+            // OneToMany relationship
+            return `${searchObject.ReferencedEntity} (${searchObject.ReferencedAttribute}) - ${searchObject.ReferencingEntity} (${searchObject.ReferencingAttribute})`;
+        }
+
+        if (searchObject.Entity1LogicalName && searchObject.Entity2LogicalName) {
+            // ManyToMany relationship  
+            return `${searchObject.Entity1LogicalName} (${searchObject.Entity1IntersectAttribute}) - ${searchObject.Entity2LogicalName} (${searchObject.Entity2IntersectAttribute})`;
+        }
+
+        if (searchObject.FormName) {
+            return searchObject.FormName;
+        }
+
+        if (searchObject.ViewName) {
+            return searchObject.ViewName;
+        }
+
+        if (searchObject.Name) {
+            return searchObject.Name;
+        }
+
+        return currentIdentifier;
+    }
+
+    /**
+     * Map metadata type string to valid type enum
+     */
+    private mapMetadataType(metadataType: string): 'entity' | 'attribute' | 'relationship' | 'form' | 'view' {
+        const type = metadataType.toLowerCase();
+        switch (type) {
+            case 'attribute': return 'attribute';
+            case 'relationship': return 'relationship';
+            case 'form': return 'form';
+            case 'view': return 'view';
+            case 'entity':
+            default: return 'entity';
+        }
+    }
+
+    /**
+     * Search attribute metadata using comprehensive recursive search
      */
     private searchAttributeMetadata(
         entityName: string,
@@ -915,31 +1050,16 @@ export class UniversalSearchService {
                 continue;
             }
             
-            const displayName = attr.DisplayName?.LocalizedLabels?.[0]?.Label;
-            
-            if (searchRegex.test(attr.LogicalName)) {
-                results.push({
-                    entityName,
-                    type: 'attribute',
-                    name: attr.LogicalName,
-                    displayName,
-                    description: '',
-                    matchLocation: 'Logical Name',
-                    matchValue: attr.LogicalName
-                });
-            }
-            
-            if (displayName && searchRegex.test(displayName)) {
-                results.push({
-                    entityName,
-                    type: 'attribute',
-                    name: attr.LogicalName,
-                    displayName,
-                    description: '',
-                    matchLocation: 'Display Name',
-                    matchValue: displayName
-                });
-            }
+            // Use comprehensive recursive search like the C# version
+            this.searchMetadataObjectRecursively(
+                entityName,
+                'attributes',
+                'Attribute',
+                attr,
+                attr.LogicalName,
+                searchRegex,
+                results
+            );
         }
     }
 
@@ -1111,8 +1231,10 @@ export class UniversalSearchService {
      * Convert wildcard pattern to regex
      */
     private wildcardToRegex(pattern: string, caseSensitive: boolean = false): RegExp {
+        // First escape all regex special characters except * and ?
         const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&');
-        const regexPattern = escaped.replace(/\\\*/g, '.*').replace(/\\\?/g, '.');
+        // Then convert wildcards: * becomes .* and ? becomes .
+        const regexPattern = escaped.replace(/\*/g, '.*').replace(/\?/g, '.');
         const flags = caseSensitive ? 'g' : 'gi';
         return new RegExp(regexPattern, flags);
     }

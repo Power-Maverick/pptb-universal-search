@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { SearchMode, EntityMetadata, SolutionInfo } from '../types/search';
+import { metadataCache } from '../services/MetadataCache';
 
 interface EntitySelectionPanelProps {
     connection: any;
@@ -89,6 +90,9 @@ export function EntitySelectionPanel({
         setEntities([]);
         onEntitiesChange([]);
         
+        // Clear metadata cache when loading new entity set
+        metadataCache.clear();
+        
         try {
             // First get all entities
             const allEntitiesResponse = await window.dataverseAPI.getAllEntitiesMetadata();
@@ -137,6 +141,9 @@ export function EntitySelectionPanel({
                 });
             
             setEntities(sortedEntities);
+            
+            // Cache entity metadata for performance optimization during search
+            metadataCache.cacheEntityMetadata(sortedEntities);
             
             await window.toolboxAPI.utils.showNotification({
                 title: 'Entities Loaded',

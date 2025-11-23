@@ -24,6 +24,9 @@ function App() {
     const [selectedSolution, setSelectedSolution] = useState<string | null>(null);
     const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
     const [isSearching, setIsSearching] = useState(false);
+    const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
+    const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
+    const [isFullScreen, setIsFullScreen] = useState(false);
     const [searchProgress, setSearchProgress] = useState<SearchProgress>({
         currentEntity: '',
         entitiesCompleted: 0,
@@ -34,6 +37,31 @@ function App() {
         isCancelled: false,
         cancel: () => {}
     });
+
+    // Toggle functions
+    const toggleHeader = () => {
+        setIsHeaderCollapsed(!isHeaderCollapsed);
+    };
+
+    const toggleFullScreen = () => {
+        const newFullScreen = !isFullScreen;
+        setIsFullScreen(newFullScreen);
+        setIsLeftPanelCollapsed(newFullScreen);
+        setIsHeaderCollapsed(newFullScreen);
+    };
+
+    // Keyboard shortcut for fullscreen toggle
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'F11' || (e.ctrlKey && e.key === 'Enter')) {
+                e.preventDefault();
+                toggleFullScreen();
+            }
+        };
+        
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isFullScreen]);
 
     // Theme detection and application
     useEffect(() => {
@@ -243,14 +271,32 @@ function App() {
     }
 
     return (
-        <div className="app">
-            <header className="header">
-                <h1>🔍 Universal Search</h1>
-                <p className="subtitle">Search across records, metadata, and solution components</p>
+        <div className={`app ${isFullScreen ? 'fullscreen' : ''}`}>
+            <header className={`header ${isHeaderCollapsed ? 'collapsed' : ''}`}>
+                <div className="header-content">
+                    <h1>🔍 Universal Search</h1>
+                    <p className="subtitle">Search across records, metadata, and solution components</p>
+                </div>
+                <div className="header-controls">
+                    <button 
+                        className="fullscreen-toggle-btn"
+                        onClick={toggleFullScreen}
+                        title={isFullScreen ? 'Exit fullscreen (F11 or Ctrl+Enter)' : 'Enter fullscreen (F11 or Ctrl+Enter)'}
+                    >
+                        {isFullScreen ? '🗗' : '🗖'}
+                    </button>
+                    <button 
+                        className="header-toggle-btn"
+                        onClick={toggleHeader}
+                        title={isHeaderCollapsed ? 'Show header' : 'Hide header'}
+                    >
+                        {isHeaderCollapsed ? '▼' : '▲'}
+                    </button>
+                </div>
             </header>
 
             <div className="main-container">
-                <div className="left-panel">
+                <div className={`left-panel ${isLeftPanelCollapsed ? 'collapsed' : ''}`}>
                     <EntitySelectionPanel
                         connection={connection}
                         searchMode={searchMode}
@@ -261,7 +307,15 @@ function App() {
                     />
                 </div>
                 
-                <div className="right-panel">
+                <div className={`right-panel ${isLeftPanelCollapsed ? 'expanded' : ''}`}>
+                    {/* Panel toggle arrow - fixed position, changes direction */}
+                    <button 
+                        className="panel-toggle-arrow"
+                        onClick={() => setIsLeftPanelCollapsed(!isLeftPanelCollapsed)}
+                        title={isLeftPanelCollapsed ? 'Show entity selection panel' : 'Hide entity selection panel'}
+                    >
+                        {isLeftPanelCollapsed ? '▶' : '◀'}
+                    </button>
                     <SearchControlsPanel
                         searchMode={searchMode}
                         searchText={searchText}
@@ -273,10 +327,12 @@ function App() {
                         onSearch={handleSearch}
                     />
                     
-                    {searchProgress.isSearching && (
+                    {/* Show progress indicator at top when searching with no results yet */}
+                    {searchProgress.isSearching && searchResults.length === 0 && (
                         <SearchProgressIndicator
                             progress={searchProgress}
                             onCancel={handleCancelSearch}
+                            position="top"
                         />
                     )}
                     
@@ -285,6 +341,15 @@ function App() {
                         searchText={searchText}
                         isSearching={isSearching}
                     />
+                    
+                    {/* Show progress indicator at bottom when searching with results visible */}
+                    {searchProgress.isSearching && searchResults.length > 0 && (
+                        <SearchProgressIndicator
+                            progress={searchProgress}
+                            onCancel={handleCancelSearch}
+                            position="bottom"
+                        />
+                    )}
                 </div>
             </div>
         </div>

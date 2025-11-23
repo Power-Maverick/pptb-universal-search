@@ -95,7 +95,6 @@ body {
 }
 
 #root {
-    max-width: 1400px;
     margin: 0 auto;
     height: calc(100vh - 32px);
     display: flex;
@@ -109,12 +108,113 @@ body {
   overflow: hidden;
 }
 
+/* Fullscreen mode styles */
+.app.fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+  background: var(--bg-gradient);
+  padding: 16px;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+}
+
+.app.fullscreen::before {
+  content: 'FULLSCREEN MODE';
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: bold;
+  opacity: 0.7;
+  z-index: 1001;
+  animation: fadeInOut 3s ease-in-out;
+}
+
+@keyframes fadeInOut {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 0.7; }
+}
+
+.app.fullscreen .header {
+  margin-bottom: 8px;
+}
+
+.app.fullscreen .main-container {
+  height: calc(100vh - 32px);
+}
+
 .header {
     text-align: center;
     color: var(--text-inverse);
     margin-bottom: 16px;
     flex-shrink: 0;
-    padding: 16px 0;
+    padding: 8px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.header.collapsed {
+    height: 32px;
+    margin-bottom: 8px;
+    overflow: hidden;
+}
+
+.header.collapsed .header-content {
+    opacity: 0;
+    transform: translateY(-20px);
+}
+
+.header-content {
+    flex: 1;
+    transition: all 0.3s ease;
+}
+
+.header-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.header-toggle-btn {
+    display:none !important;
+}
+.header-toggle-btn,
+.fullscreen-toggle-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: var(--text-inverse);
+    border-radius: 4px;
+    padding: 6px 8px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s ease;
+    min-width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 2px;
+}
+
+.header-toggle-btn:hover,
+.fullscreen-toggle-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.4);
+    transform: scale(1.1);
+}
+
+.fullscreen-toggle-btn {
+    font-size: 16px;
 }
 
 .header h1 {
@@ -178,6 +278,16 @@ body {
   flex-direction: column;
   overflow: hidden;
   margin-right: 2px;
+  transition: all 0.3s ease;
+}
+
+/* Hide left panel smoothly */
+.left-panel.collapsed {
+  width: 0;
+  min-width: 0;
+  margin-right: 0;
+  opacity: 0;
+  overflow: hidden;
 }
 
 .right-panel {
@@ -188,6 +298,59 @@ body {
   flex-direction: column;
   overflow: hidden;
   min-width: 0;
+  transition: all 0.3s ease;
+}
+
+/* Update the right panel expansion to not use :has() selector */
+.right-panel.expanded {
+  border-radius: 8px;
+}
+
+/* Panel Toggle Arrow - Fixed on Right Panel Left Side */
+.panel-toggle-arrow:hover {
+  left: -5px;
+}
+.panel-toggle-arrow {
+  position: absolute;
+  top: 50%;
+  left: -18px;
+  z-index: 10;
+  background: var(--primary-color);
+  color: white;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  line-height: 1;
+  width: 24px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+}
+
+.panel-toggle-arrow:hover {
+  background: var(--primary-hover);
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Position the arrow on the right panel */
+.right-panel {
+  position: relative;
+}
+
+/* Remove the old panel controls */
+.panel-controls {
+  display: none;
+}
+
+.toggle-panel-btn {
+  display: none;
 }
 
 /* Panel Header Styling */
@@ -504,13 +667,14 @@ body {
 }
 
 .results-header {
-  padding: 10px 16px;
+  padding: 6px 12px;
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-color);
   font-weight: 600;
   color: var(--text-primary);
   flex-shrink: 0;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
+  line-height: 1.3;
 }
 
 .search-tabs {
@@ -521,12 +685,12 @@ body {
 }
 
 .search-tab {
-  padding: 8px 16px;
+  padding: 6px 12px;
   cursor: pointer;
   border: none;
   background: none;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   border-bottom: 2px solid transparent;
   transition: all 0.3s ease;
@@ -552,12 +716,13 @@ body {
 }
 
 .results-summary {
-  padding: 6px 16px;
+  padding: 4px 12px;
   background: var(--bg-secondary);
   color: var(--text-muted);
   font-size: 11px;
   border-bottom: 1px solid var(--border-color);
   flex-shrink: 0;
+  line-height: 1.3;
 }
 
 .data-grid-container {
@@ -929,97 +1094,99 @@ body {
   background: var(--bg-secondary);
 }
 
-/* Search Progress Indicator */
-.search-progress-indicator {
+/* Search Progress Indicator - Dynamic Positioning */
+.search-progress-indicator-compact {
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
-  border-radius: 6px;
-  padding: 12px 16px;
-  margin: 8px 0;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.progress-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 8px;
-}
-
-.progress-info {
-  flex: 1;
-}
-
-.progress-status {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.current-entity {
-  font-weight: 600;
-  color: var(--text-primary);
-  font-size: 0.9rem;
-}
-
-.progress-stats {
-  color: var(--text-muted);
-  font-size: 0.8rem;
-}
-
-.time-remaining {
-  color: var(--text-secondary);
-  font-size: 0.8rem;
-  font-style: italic;
-  margin-top: 2px;
-}
-
-.cancel-button {
-  background: var(--error-color);
-  color: white;
-  border: none;
-  border-radius: 4px;
   padding: 6px 12px;
-  font-size: 0.8rem;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
+  margin: 0;
   flex-shrink: 0;
 }
 
-.cancel-button:hover {
+/* Top position styling (when no results) */
+.search-progress-top {
+  border-radius: 4px;
+  margin: 6px 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Bottom position styling (when results visible) */
+.search-progress-bottom {
+  border-radius: 4px 4px 0 0;
+  border-bottom: none;
+  box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.progress-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.progress-text {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  flex: 1;
+}
+
+.progress-entity {
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+
+.progress-count {
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.progress-time {
+  color: var(--text-muted);
+  font-style: italic;
+  white-space: nowrap;
+}
+
+.progress-percent {
+  color: var(--primary-color);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.progress-cancel-btn {
+  background: var(--error-color);
+  color: white;
+  border: none;
+  border-radius: 3px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  white-space: nowrap;
+}
+
+.progress-cancel-btn:hover {
   background: var(--error-hover);
 }
 
-.progress-bar-container {
-  position: relative;
+.progress-bar-compact {
   background: var(--bg-accent);
-  border-radius: 4px;
-  height: 20px;
+  border-radius: 3px;
+  height: 6px;
   overflow: hidden;
   border: 1px solid var(--border-color);
 }
 
-.progress-bar {
+.progress-bar-fill {
   height: 100%;
   background: linear-gradient(90deg, var(--primary-color) 0%, var(--primary-hover) 100%);
   transition: width 0.3s ease;
-  border-radius: 3px;
-}
-
-.progress-percentage {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-}
-
-[data-theme="dark"] .progress-percentage {
-  color: var(--text-primary);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+  border-radius: 2px;
 }
 
 /* Search Progress Indicator - Animation */
@@ -1053,13 +1220,64 @@ body {
 
 /* Responsive layout adjustments */
 @media (max-width: 768px) {
-  .progress-header {
+  .progress-line {
+    flex-direction: column;
+    gap: 6px;
+    align-items: stretch;
+  }
+  
+  .progress-text {
+    justify-content: space-between;
+  }
+  
+  .progress-entity {
+    max-width: 150px;
+  }
+  
+  .progress-cancel-btn {
+    align-self: flex-end;
+    width: auto;
+  }
+  
+  .header {
     flex-direction: column;
     gap: 8px;
   }
   
-  .cancel-button {
-    align-self: flex-end;
+  .header-controls {
+    justify-content: center;
+  }
+  
+  /* Mobile: Start with collapsed panel for more space */
+  .main-container {
+    flex-direction: column;
+  }
+  
+  .left-panel {
+    width: 100%;
+    min-width: 100%;
+    border-radius: 8px 8px 0 0;
+  }
+  
+  .right-panel {
+    border-radius: 0 0 8px 8px;
+  }
+  
+  .right-panel.expanded {
+    border-radius: 8px;
+  }
+  
+  .panel-toggle-arrow {
+    top: 15px;
+    left: 15px;
+    position: absolute;
+    z-index: 100;
+    background: var(--primary-color);
+    color: white;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
   }
 }
 @media (max-width: 768px) {

@@ -46,9 +46,6 @@ export function SearchControlsPanel({
                                 />
                                 Match Case
                             </label>
-                            <div className="info-text">
-                                💡 Lookups & picklists auto-searched
-                            </div>
                         </div>
                     </div>
                 );
