@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { SearchOptions } from '../types/search';
 import './SearchResults.css';
 
 interface SearchResult {
@@ -15,9 +16,10 @@ interface SearchResultsProps {
     results: SearchResult[];
     searchText: string;
     isSearching: boolean;
+    searchOptions: SearchOptions;
 }
 
-export function SearchResults({ results, searchText, isSearching }: SearchResultsProps) {
+export function SearchResults({ results, searchText, isSearching, searchOptions }: SearchResultsProps) {
     const [activeTabIndex, setActiveTabIndex] = useState(0);
     const [sortColumn, setSortColumn] = useState<string | null>(null);
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -57,6 +59,10 @@ export function SearchResults({ results, searchText, isSearching }: SearchResult
         
         // Filter to show only relevant columns, preferring those with formatted values
         const finalKeys = Array.from(allKeys).filter(key => {
+            // Hide Link column but keep it available in the record data
+            if (key === 'Link') {
+                return false;
+            }
             // Skip raw values if we have formatted versions
             if (formattedKeys.has(key)) {
                 return false; // We'll use the formatted version instead
@@ -139,7 +145,9 @@ export function SearchResults({ results, searchText, isSearching }: SearchResult
             return <span>{textStr}</span>;
         }
         
-        const regex = new RegExp(`(${cleanSearchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+        // Use case sensitivity based on search options
+        const flags = searchOptions.matchCase ? 'g' : 'gi';
+        const regex = new RegExp(`(${cleanSearchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, flags);
         
         // Only highlight if the text actually contains the search term
         if (!regex.test(textStr)) {
@@ -154,7 +162,8 @@ export function SearchResults({ results, searchText, isSearching }: SearchResult
             <span>
                 {parts.map((part, index) => {
                     // Create a new regex for each test to avoid lastIndex issues
-                    const testRegex = new RegExp(`^${cleanSearchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+                    const testFlags = searchOptions.matchCase ? '' : 'i';
+                    const testRegex = new RegExp(`^${cleanSearchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, testFlags);
                     return testRegex.test(part) ? 
                         <mark key={index} className="highlight">{part}</mark> : 
                         <span key={index}>{part}</span>;
@@ -201,7 +210,58 @@ export function SearchResults({ results, searchText, isSearching }: SearchResult
     const handleRowClick = async (record: any) => {
         if (!activeResult) return;
         
+        console.log('Row clicked:', { 
+            resultType: activeResult.type, 
+            recordKeys: Object.keys(record),
+            record: record,
+            hasLink: 'Link' in record,
+            linkValue: record.Link
+        });
+        
         try {
+            // Check if this is a metadata result (either by type or presence of metadata-specific fields)
+            const isMetadataResult = activeResult.type === 'metadata' || 
+                                   record.Type || record['Match Location'] || record['Match Value'];
+            
+            if (isMetadataResult) {
+                // For metadata results, we don't want to try opening as records
+                // Check if we have a Link field
+                if (record.Link && record.Link.trim()) {
+                    try {
+                        const newWindow = window.open(record.Link, '_blank');
+                        if (newWindow) {
+                            await window.toolboxAPI.utils.showNotification({
+                                title: 'Maker Portal Opened',
+                                body: 'Power Platform maker portal opened in new browser tab.',
+                                type: 'success'
+                            });
+                        } else {
+                            throw new Error('Popup blocked or failed to open window');
+                        }
+                    } catch (windowError) {
+                        console.warn('Failed to open maker portal window, copying link to clipboard:', windowError);
+                        
+                        // Fallback: copy to clipboard
+                        await window.toolboxAPI.utils.copyToClipboard(record.Link);
+                        await window.toolboxAPI.utils.showNotification({
+                            title: 'Maker Portal Link Copied',
+                            body: 'Could not open maker portal directly. Link copied to clipboard - paste in browser to open.',
+                            type: 'warning'
+                        });
+                    }
+                } else {
+                    // Metadata result but no link available
+                    await window.toolboxAPI.utils.showNotification({
+                        title: 'Metadata Item',
+                        body: 'This is a metadata item. Power Platform maker portal links are not yet implemented.',
+                        type: 'info'
+                    });
+                }
+                return;
+            }
+            
+            // For non-metadata results (actual records), continue with the existing logic
+            
             // Try to find the entity ID in various possible fields
             const entityName = activeResult.entityName;
             const primaryIdField = `${entityName}id`;
@@ -308,7 +368,9 @@ export function SearchResults({ results, searchText, isSearching }: SearchResult
             textToSearch = String(value);
         }
         
-        const regex = new RegExp(cleanSearchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+        // Use case sensitivity based on search options
+        const flags = searchOptions.matchCase ? '' : 'i';
+        const regex = new RegExp(cleanSearchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), flags);
         return regex.test(textToSearch);
     };
 

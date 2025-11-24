@@ -6,6 +6,10 @@ export interface SearchOptions {
     // Common options
     matchCase: boolean;
     
+    // Record search options
+    searchPicklists: boolean;
+    searchLookups: boolean;
+    
     // Metadata search options
     searchAttributes: boolean;
     searchEntities: boolean;
@@ -97,6 +101,7 @@ export interface MetadataSearchResult {
     description?: string;
     matchLocation: string;
     matchValue: string;
+    link?: string;
 }
 
 export interface SolutionSearchResult {

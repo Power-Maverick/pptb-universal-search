@@ -14,6 +14,8 @@ function App() {
     const [searchService] = useState(() => new UniversalSearchService());
     const [searchOptions, setSearchOptions] = useState<SearchOptions>({
         matchCase: false,
+        searchPicklists: false,
+        searchLookups: false,
         searchAttributes: true,
         searchEntities: true,
         searchRelationships: false,
@@ -340,6 +342,7 @@ function App() {
                         results={searchResults}
                         searchText={searchText}
                         isSearching={isSearching}
+                        searchOptions={searchOptions}
                     />
                     
                     {/* Show progress indicator at bottom when searching with results visible */}

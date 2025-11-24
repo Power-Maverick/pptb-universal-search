@@ -46,6 +46,24 @@ export function SearchControlsPanel({
                                 />
                                 Match Case
                             </label>
+                            <label className="option-item">
+                                <input
+                                    type="checkbox"
+                                    checked={searchOptions.searchPicklists}
+                                    onChange={(e) => handleOptionChange('searchPicklists', e.target.checked)}
+                                    disabled={isSearching}
+                                />
+                                Search Picklists
+                            </label>
+                            <label className="option-item">
+                                <input
+                                    type="checkbox"
+                                    checked={searchOptions.searchLookups}
+                                    onChange={(e) => handleOptionChange('searchLookups', e.target.checked)}
+                                    disabled={isSearching}
+                                />
+                                Search Lookups
+                            </label>
                         </div>
                     </div>
                 );
@@ -182,6 +200,7 @@ export function SearchControlsPanel({
                             Metadata
                         </button>
                         <button
+                            hidden={true}
                             className={`tab-header ${searchMode === 'solution' ? 'active' : ''}`}
                             onClick={() => onModeChange('solution')}
                             disabled={isSearching}
