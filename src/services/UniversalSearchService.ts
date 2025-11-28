@@ -1036,7 +1036,7 @@ export class UniversalSearchService {
         const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&');
         // Then convert wildcards: * becomes .* and ? becomes .
         const regexPattern = escaped.replace(/\*/g, '.*').replace(/\?/g, '.');
-        const flags = caseSensitive ? 'g' : 'gi';
+        const flags = caseSensitive ? '' : 'i'; // Remove global flag to prevent state issues
         return new RegExp(regexPattern, flags);
     }
 

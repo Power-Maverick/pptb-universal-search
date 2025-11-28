@@ -53,10 +53,6 @@
   transition: all 0.2s ease;
 }
 
-.search-results .tab-header:hover {
-  background: #f8f8f8;
-}
-
 .search-results .tab-header.active {
   background: var(--panel-background);
   border-bottom-color: var(--primary-color);
