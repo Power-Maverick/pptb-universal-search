@@ -5,6 +5,7 @@ import { EntityMetadata } from '../types/search';
  */
 class MetadataCache {
     private entityMetadataCache = new Map<string, EntityMetadata>();
+    private picklistCache = new Map<string, any[]>();
     
     /**
      * Cache entity metadata from the initial entity list load
@@ -50,19 +51,50 @@ class MetadataCache {
     }
     
     /**
+     * Cache picklist attributes for an entity
+     */
+    cachePicklistAttributes(entityName: string, picklistAttributes: any[]): void {
+        this.picklistCache.set(entityName, picklistAttributes);
+    }
+    
+    /**
+     * Get cached picklist attributes for an entity
+     */
+    getPicklistAttributes(entityName: string): any[] | undefined {
+        return this.picklistCache.get(entityName);
+    }
+    
+    /**
+     * Check if picklist attributes are cached for an entity
+     */
+    hasPicklistAttributes(entityName: string): boolean {
+        return this.picklistCache.has(entityName);
+    }
+    
+    /**
      * Clear the cache
      */
     clear(): void {
         this.entityMetadataCache.clear();
+        this.picklistCache.clear();
     }
     
     /**
      * Get cache stats for debugging
      */
-    getCacheStats(): { size: number; entities: string[] } {
+    getCacheStats(): { 
+        entityMetadata: { size: number; entities: string[] };
+        picklistMetadata: { size: number; entities: string[] };
+    } {
         return {
-            size: this.entityMetadataCache.size,
-            entities: Array.from(this.entityMetadataCache.keys())
+            entityMetadata: {
+                size: this.entityMetadataCache.size,
+                entities: Array.from(this.entityMetadataCache.keys())
+            },
+            picklistMetadata: {
+                size: this.picklistCache.size,
+                entities: Array.from(this.picklistCache.keys())
+            }
         };
     }
 }

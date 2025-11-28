@@ -536,9 +536,6 @@ export class UniversalSearchService {
         const isNumber = !isNaN(Number(searchText));
         const isDate = !isNaN(Date.parse(searchText));
         
-        // Cache for entity attributes metadata to avoid multiple API calls for picklist searches
-        let entityAttributesMetadata: any[] | null = null;
-        
         // Build the FetchXML - use all-attributes to avoid request length issues
         
         for (const attr of attributes) { // Include ALL attributes, not just first 20
@@ -614,18 +611,7 @@ export class UniversalSearchService {
                     } else if (searchOptions.searchPicklists && !isNumber) {
                         // Search through picklist option labels to find matches
                         try {
-                            // Lazy load the entity attributes metadata for picklist searches
-                            if (!entityAttributesMetadata) {
-                                const attributesResponse = await window.dataverseAPI.getEntityRelatedMetadata(entityName, 'Attributes');
-                                if (attributesResponse?.value && Array.isArray(attributesResponse.value)) {
-                                    entityAttributesMetadata = attributesResponse.value;
-                                } else {
-                                    console.warn(`Could not get attributes metadata for picklist search on ${entityName}`);
-                                    entityAttributesMetadata = [];
-                                }
-                            }
-                            
-                            const optionValues = await this.searchPicklistOptions(entityName, attrName, searchText, searchOptions.matchCase, entityAttributesMetadata);
+                            const optionValues = await this.searchPicklistOptions(entityName, attrName, searchText, searchOptions.matchCase);
                             for (const optionValue of optionValues) {
                                 conditions.push(`<condition attribute="${attrName}" operator="eq" value="${optionValue}" />`);
                             }
@@ -1154,29 +1140,44 @@ export class UniversalSearchService {
     /**
      * Search picklist options to find matching option values for a given text search
      */
-    private async searchPicklistOptions(entityName: string, attributeName: string, searchText: string, matchCase: boolean, cachedMetadata?: any[]): Promise<number[]> {
+    private async searchPicklistOptions(entityName: string, attributeName: string, searchText: string, matchCase: boolean): Promise<number[]> {
         try {
-            // Use cached metadata if provided, otherwise fetch it
-            let attributesMetadata = cachedMetadata;
-            if (!attributesMetadata) {
-                const attributesResponse = await window.dataverseAPI.getEntityRelatedMetadata(entityName, 'Attributes');
+            // Check cache first
+            let picklistAttributes = metadataCache.getPicklistAttributes(entityName);
+            
+            if (!picklistAttributes) {
+                // Cache miss - fetch from API
+                const odataQuery = `EntityDefinitions(LogicalName='${entityName}')/Attributes/Microsoft.Dynamics.CRM.PicklistAttributeMetadata?$select=LogicalName&$expand=GlobalOptionSet($select=Options)`;
                 
-                if (!attributesResponse || !attributesResponse.value || !Array.isArray(attributesResponse.value)) {
-                    console.warn(`Could not get attributes metadata for ${entityName}`);
+                const response = await window.dataverseAPI.queryData(odataQuery);
+                
+                if (!response || !response.value || !Array.isArray(response.value)) {
+                    console.warn(`Could not get picklist attributes metadata for ${entityName}`);
                     return [];
                 }
-                attributesMetadata = attributesResponse.value;
+                
+                // Cache the results
+                picklistAttributes = response.value;
+                metadataCache.cachePicklistAttributes(entityName, picklistAttributes);
+                console.log(`Cached ${picklistAttributes.length} picklist attributes for entity ${entityName}`);
+            } else {
+                console.log(`Using cached picklist metadata for entity ${entityName}`);
             }
 
             // Find the specific attribute
-            const targetAttribute = attributesMetadata.find((attr: any) => attr.LogicalName === attributeName);
+            const targetAttribute = picklistAttributes.find((attr: any) => attr.LogicalName === attributeName);
             if (!targetAttribute) {
-                console.warn(`Attribute ${attributeName} not found for entity ${entityName}`);
+                console.warn(`Picklist attribute ${attributeName} not found for entity ${entityName}`);
                 return [];
             }
 
-            const optionSet = targetAttribute.OptionSet;
-            if (!optionSet || !optionSet.Options || !Array.isArray(optionSet.Options)) {
+            // Check if it has GlobalOptionSet or local OptionSet
+            let optionSet = targetAttribute.GlobalOptionSet;
+            if (!optionSet && targetAttribute.OptionSet) {
+                optionSet = targetAttribute.OptionSet;
+            }
+
+            if (!optionSet || !(optionSet as any).Options || !Array.isArray((optionSet as any).Options)) {
                 console.warn(`No OptionSet found for ${entityName}.${attributeName}`);
                 return [];
             }
@@ -1185,9 +1186,12 @@ export class UniversalSearchService {
             const matchingValues: number[] = [];
 
             // Search through option labels
-            for (const option of optionSet.Options) {
+            for (const option of (optionSet as any).Options) {
                 if (option && option.Label && option.Value !== undefined && option.Value !== null) {
-                    const label = option.Label.UserLocalizedLabel?.Label || option.Label.LocalizedLabels?.[0]?.Label || '';
+                    // Handle different label structures
+                    const label = option.Label.UserLocalizedLabel?.Label || 
+                                 option.Label.LocalizedLabels?.[0]?.Label || 
+                                 (typeof option.Label === 'string' ? option.Label : '');
                     
                     if (label && regex.test(label)) {
                         matchingValues.push(option.Value);
