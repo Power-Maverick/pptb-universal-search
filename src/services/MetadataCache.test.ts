@@ -14,29 +14,19 @@ describe('MetadataCache', () => {
         LogicalName: 'account',
         DisplayName: {
           UserLocalizedLabel: { Label: 'Account' },
-          LocalizedLabels: [{ Label: 'Account' }]
+          LocalizedLabels: [{ Label: 'Account', LanguageCode: 1033 }]
         },
-        AttributeType: 'Entity',
-        IsValidForRead: true,
-        IsCustomAttribute: false,
         SchemaName: 'Account'
       },
       {
         LogicalName: 'contact',
         DisplayName: {
-          LocalizedLabels: [{ Label: 'Contact' }]
+          LocalizedLabels: [{ Label: 'Contact', LanguageCode: 1033 }]
         },
-        AttributeType: 'Entity',
-        IsValidForRead: true,
-        IsCustomAttribute: false,
         SchemaName: 'Contact'
       },
       {
         LogicalName: 'lead',
-        LogicalName: 'lead',
-        AttributeType: 'Entity',
-        IsValidForRead: true,
-        IsCustomAttribute: false,
         SchemaName: 'Lead'
       }
     ];
@@ -131,9 +121,6 @@ describe('MetadataCache', () => {
     it('should clear all caches', () => {
       const mockEntities: EntityMetadata[] = [{
         LogicalName: 'account',
-        AttributeType: 'Entity',
-        IsValidForRead: true,
-        IsCustomAttribute: false,
         SchemaName: 'Account'
       }];
       
@@ -153,16 +140,10 @@ describe('MetadataCache', () => {
       const mockEntities: EntityMetadata[] = [
         {
           LogicalName: 'account',
-          AttributeType: 'Entity',
-          IsValidForRead: true,
-          IsCustomAttribute: false,
           SchemaName: 'Account'
         },
         {
           LogicalName: 'contact',
-          AttributeType: 'Entity',
-          IsValidForRead: true,
-          IsCustomAttribute: false,
           SchemaName: 'Contact'
         }
       ];
@@ -192,9 +173,6 @@ describe('MetadataCache', () => {
 
     it('should handle entities without LogicalName', () => {
       const invalidEntities = [{
-        AttributeType: 'Entity',
-        IsValidForRead: true,
-        IsCustomAttribute: false,
         SchemaName: 'Invalid'
       }] as EntityMetadata[];
       

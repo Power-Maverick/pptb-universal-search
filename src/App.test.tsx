@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import App from './App';
 import { mockDataverseAPI, mockToolboxAPI } from './test/setup';
 
@@ -15,7 +15,7 @@ describe('App Component', () => {
     vi.clearAllMocks();
     
     // Mock successful connection
-    mockToolboxAPI.connections = [
+    (mockToolboxAPI as any).connections = [
       {
         connectionString: 'test-connection',
         organizationFriendlyName: 'Test Org',
@@ -70,7 +70,7 @@ describe('App Component', () => {
 
   describe('Search Controls', () => {
     it('should render search controls when connected', () => {
-      mockToolboxAPI.connections = [
+      (mockToolboxAPI as any).connections = [
         {
           connectionString: 'test-connection',
           organizationFriendlyName: 'Test Org',

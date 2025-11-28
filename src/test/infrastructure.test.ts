@@ -85,7 +85,7 @@ describe('Test Infrastructure', () => {
   describe('Development Workflow Integration', () => {
     it('should support watch mode for development', () => {
       // npm run test:watch
-      expect(process.env.NODE_ENV !== 'production').toBe(true);
+      expect(typeof (import.meta as any).env).toBe('object');
     });
 
     it('should provide coverage reporting', () => {
