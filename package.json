@@ -4,7 +4,15 @@
   "displayName": "Universal Search",
   "description": "A comprehensive search tool for finding records, metadata, and solution components across Dataverse environments using wildcards and specific values.",
   "main": "index.html",
+  "keywords": ["search", "metadata", "dataverse", "find"],
   "author": "Mike!",
+  "contributors": [
+    "Mike Ochs <mike@mikefactorial.com>"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mikefactorial/pptb-universal-search"
+  },
   "license": "MIT",
   "engines": {
     "node": ">=18.0.0"
