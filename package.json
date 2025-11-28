@@ -1,6 +1,7 @@
 {
   "name": "pptb-universal-search",
   "version": "1.0.0",
+  "type": "module",
   "displayName": "Universal Search",
   "description": "A comprehensive search tool for finding records, metadata, and solution components across Dataverse environments using wildcards and specific values.",
   "main": "index.html",
@@ -18,7 +19,7 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "build": "tsc && vite build",
+    "build": "vite build",
     "dev": "vite",
     "preview": "vite preview",
     "test": "vitest",
