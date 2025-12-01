@@ -1,20 +1,28 @@
 {
   "name": "pptb-universal-search",
   "version": "1.0.0",
-  "type": "module",
   "displayName": "Universal Search",
   "description": "A comprehensive search tool for finding records, metadata, and solution components across Dataverse environments using wildcards and specific values.",
-  "main": "index.html",
-  "keywords": ["search", "metadata", "dataverse", "find"],
-  "author": "Mike!",
   "contributors": [
-    "Mike Ochs <mike@mikefactorial.com>"
-  ],
+    {
+      "name": "Mike Ochs",
+      "url": "https://github.com/mikefactorial"
+    }
+  ],  
+  "license": "MIT",
+  "configurations": {
+    "repository": "https://github.com/mikefactorial/pptb-universal-search",
+    "website": "https://mikefactorial.com/dynamics-365-universal-search-for-xrmtoolbox/",
+    "iconUrl": "https://raw.githubusercontent.com/mikefactorial/pptb-universal-search/main/universal-search/icon-64.png",
+    "readmeUrl": "https://github.com/mikefactorial/pptb-universal-search/blob/main/README.md"
+  },
+  "author": "Mike!",
   "repository": {
     "type": "git",
-    "url": "https://github.com/mikefactorial/pptb-universal-search"
+    "url": ""
   },
-  "license": "MIT",
+  "main": "index.html",
+  "type": "module",
   "engines": {
     "node": ">=18.0.0"
   },
