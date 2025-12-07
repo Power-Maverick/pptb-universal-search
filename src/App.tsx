@@ -65,39 +65,34 @@ function App() {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [isFullScreen]);
 
+    // Theme application utility
+    const applyTheme = useCallback(async () => {
+        try {
+            if (window.toolboxAPI?.utils?.getCurrentTheme) {
+                const theme = await window.toolboxAPI.utils.getCurrentTheme();
+                console.log('Applying theme:', theme);
+                
+                // Apply theme to document
+                if (theme === 'dark' || theme.includes('dark')) {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                } else {
+                    document.documentElement.removeAttribute('data-theme');
+                }
+            } else {
+                console.log('Theme API not available, using default theme');
+            }
+        } catch (error) {
+            console.error('Error applying theme:', error);
+            // Fallback to light theme
+            document.documentElement.removeAttribute('data-theme');
+        }
+    }, []);
+
     // Theme detection and application
     useEffect(() => {
-        const applyTheme = async () => {
-            try {
-                if (window.toolboxAPI?.utils?.getCurrentTheme) {
-                    const theme = await window.toolboxAPI.utils.getCurrentTheme();
-                    console.log('Detected theme:', theme);
-                    
-                    // Apply theme to document
-                    if (theme === 'dark' || theme.includes('dark')) {
-                        document.documentElement.setAttribute('data-theme', 'dark');
-                    } else {
-                        document.documentElement.removeAttribute('data-theme');
-                    }
-                } else {
-                    console.log('Theme API not available, using default theme');
-                }
-            } catch (error) {
-                console.error('Error getting theme:', error);
-                // Fallback to light theme
-                document.documentElement.removeAttribute('data-theme');
-            }
-        };
-
+        // Apply theme on initial load
         applyTheme();
-
-        // Re-check theme periodically for changes
-        const themeInterval = setInterval(applyTheme, 5000);
-        
-        return () => {
-            clearInterval(themeInterval);
-        };
-    }, []);
+    }, [applyTheme]);
 
     // Handle platform events
     const handleEvent = useCallback(
@@ -112,9 +107,14 @@ function App() {
                     refreshConnection();
                     setSearchResults([]);
                     break;
+
+                case 'settings:updated':
+                    // Refresh theme when settings change
+                    applyTheme();
+                    break;
             }
         },
-        [refreshConnection]
+        [refreshConnection, applyTheme]
     );
 
     useToolboxEvents(handleEvent);
