@@ -13,7 +13,7 @@
   "configurations": {
     "repository": "https://github.com/mikefactorial/pptb-universal-search",
     "website": "https://mikefactorial.com/dynamics-365-universal-search-for-xrmtoolbox/",
-    "iconUrl": "https://raw.githubusercontent.com/mikefactorial/pptb-universal-search/main/universal-search/icon-64.png",
+    "iconUrl": "https://github.com/mikefactorial/pptb-universal-search/blob/main/icon-64.png",
     "readmeUrl": "https://github.com/mikefactorial/pptb-universal-search/blob/main/README.md"
   },
   "author": "Mike!",
@@ -37,7 +37,11 @@
   },
   "dependencies": {
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "jsdom": "^25.0.1",
+    "typescript": "^5.6.3",
+    "vite": "^7.1.11",
+    "vitest": "^2.1.0"
   },
   "devDependencies": {
     "@pptb/types": "^1.0.1",
@@ -48,10 +52,6 @@
     "@testing-library/react": "^14.1.2",
     "@testing-library/user-event": "^14.5.2",
     "@vitest/coverage-v8": "^2.1.0",
-    "jsdom": "^25.0.1",
-    "typescript": "^5.6.3",
-    "vite": "^7.1.11",
-    "vitest": "^2.1.0"
   },
   "files": [
     "dist",
