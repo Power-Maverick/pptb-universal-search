@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./universal-search
+        working-directory: universal-search
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -53,7 +53,7 @@ jobs:
       id-token: write # to enable use of OIDC for npm provenance
     defaults:
       run:
-        working-directory: ./universal-search
+        working-directory: universal-search
     steps:
       - name: Checkout
         uses: actions/checkout@v4
