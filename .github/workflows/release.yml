@@ -24,25 +24,17 @@ jobs:
           node-version: 20
 
       - name: Install dependencies
-        run: |
-          cd universal-search
-          npm ci
+        run: npm ci
 
       - name: Lint commits
         if: github.event_name == 'pull_request'
-        run: |
-          cd universal-search
-          npx commitlint --from ${{ github.event.pull_request.head.sha }}~${{ github.event.pull_request.commits }} --to ${{ github.event.pull_request.head.sha }} --verbose
+        run: npx commitlint --from ${{ github.event.pull_request.head.sha }}~${{ github.event.pull_request.commits }} --to ${{ github.event.pull_request.head.sha }} --verbose
 
       - name: Run tests
-        run: |
-          cd universal-search
-          npm test -- --run
+        run: npm test -- --run
 
       - name: Build
-        run: |
-          cd universal-search
-          npm run build
+        run: npm run build
 
   release:
     name: Release
@@ -66,29 +58,19 @@ jobs:
           node-version: 20
 
       - name: Install dependencies
-        run: |
-          cd universal-search
-          npm ci
+        run: npm ci
 
       - name: Verify the integrity of provenance attestations and registry signatures for installed dependencies
-        run: |
-          cd universal-search
-          npm audit signatures
+        run: npm audit signatures
 
       - name: Build
-        run: |
-          cd universal-search
-          npm run build
+        run: npm run build
 
       - name: Finalize package
-        run: |
-          cd universal-search
-          npm run finalize-package
+        run: npm run finalize-package
 
       - name: Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          cd universal-search
-          npx semantic-release
+        run: npx semantic-release
