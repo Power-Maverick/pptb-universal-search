@@ -1,6 +1,6 @@
 {
   "name": "pptb-universal-search",
-  "version": "1.0.5",
+  "version": "1.0.0",
   "displayName": "Universal Search",
   "description": "A comprehensive search tool for finding records, metadata, and solution components across Dataverse environments using wildcards and specific values.",
   "contributors": [
@@ -8,7 +8,7 @@
       "name": "Mike Ochs",
       "url": "https://github.com/mikefactorial"
     }
-  ],  
+  ],
   "license": "MIT",
   "configurations": {
     "repository": "https://github.com/mikefactorial/pptb-universal-search",
