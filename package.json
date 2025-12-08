@@ -1,6 +1,6 @@
 {
   "name": "pptb-universal-search",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "displayName": "Universal Search",
   "description": "A comprehensive search tool for finding records, metadata, and solution components across Dataverse environments using wildcards and specific values.",
   "contributors": [
@@ -33,7 +33,8 @@
     "test": "vitest",
     "test:watch": "vitest --watch",
     "test:coverage": "vitest --coverage",
-    "finalize-package": "npm shrinkwrap"
+    "finalize-package": "npm shrinkwrap",
+    "semantic-release": "semantic-release"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -51,7 +52,14 @@
     "@testing-library/jest-dom": "^6.4.2",
     "@testing-library/react": "^14.1.2",
     "@testing-library/user-event": "^14.5.2",
-    "@vitest/coverage-v8": "^2.1.0"
+    "@vitest/coverage-v8": "^2.1.0",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^10.0.7",
+    "@semantic-release/npm": "^12.0.1",
+    "semantic-release": "^23.0.0",
+    "@commitlint/cli": "^18.0.0",
+    "@commitlint/config-conventional": "^18.0.0"
   },
   "files": [
     "dist",
