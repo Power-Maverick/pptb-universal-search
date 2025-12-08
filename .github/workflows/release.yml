@@ -12,9 +12,6 @@ jobs:
   test:
     name: Test & Build
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: universal-search
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -27,17 +24,25 @@ jobs:
           node-version: 20
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          cd universal-search
+          npm ci
 
       - name: Lint commits
         if: github.event_name == 'pull_request'
-        run: npx commitlint --from ${{ github.event.pull_request.head.sha }}~${{ github.event.pull_request.commits }} --to ${{ github.event.pull_request.head.sha }} --verbose
+        run: |
+          cd universal-search
+          npx commitlint --from ${{ github.event.pull_request.head.sha }}~${{ github.event.pull_request.commits }} --to ${{ github.event.pull_request.head.sha }} --verbose
 
       - name: Run tests
-        run: npm test -- --run
+        run: |
+          cd universal-search
+          npm test -- --run
 
       - name: Build
-        run: npm run build
+        run: |
+          cd universal-search
+          npm run build
 
   release:
     name: Release
@@ -49,9 +54,6 @@ jobs:
       issues: write # to be able to comment on released issues
       pull-requests: write # to be able to comment on released pull requests
       id-token: write # to enable use of OIDC for npm provenance
-    defaults:
-      run:
-        working-directory: universal-search
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -64,19 +66,29 @@ jobs:
           node-version: 20
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          cd universal-search
+          npm ci
 
       - name: Verify the integrity of provenance attestations and registry signatures for installed dependencies
-        run: npm audit signatures
+        run: |
+          cd universal-search
+          npm audit signatures
 
       - name: Build
-        run: npm run build
+        run: |
+          cd universal-search
+          npm run build
 
       - name: Finalize package
-        run: npm run finalize-package
+        run: |
+          cd universal-search
+          npm run finalize-package
 
       - name: Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npx semantic-release
+        run: |
+          cd universal-search
+          npx semantic-release
