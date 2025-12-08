@@ -1,6 +1,6 @@
 {
   "name": "pptb-universal-search",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "displayName": "Universal Search",
   "description": "A comprehensive search tool for finding records, metadata, and solution components across Dataverse environments using wildcards and specific values.",
   "contributors": [
