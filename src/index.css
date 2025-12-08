@@ -111,7 +111,7 @@ body {
 /* Fullscreen mode styles */
 .app.fullscreen {
   position: fixed;
-  top: 0;
+  top: -10px;
   left: 0;
   right: 0;
   bottom: 0;
@@ -183,6 +183,9 @@ body {
     display: flex;
     gap: 8px;
     align-items: center;
+    position: absolute;
+    right: 0;
+    top: 0;
 }
 
 .header-toggle-btn {
