@@ -10,7 +10,7 @@ import { UniversalSearchService } from './services/UniversalSearchService';
 function App() {
     const { connection, isLoading, refreshConnection } = useConnection();
     const [searchMode, setSearchMode] = useState<SearchMode>('records');
-    const [searchText, setSearchText] = useState('');
+    const [searchText, setSearchText] = useState('*');
     const [searchService] = useState(() => new UniversalSearchService());
     const [searchOptions, setSearchOptions] = useState<SearchOptions>({
         matchCase: false,
