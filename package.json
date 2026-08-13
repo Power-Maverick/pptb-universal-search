@@ -27,7 +27,7 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "build": "vite build",
+    "build": "vite build && tsc -p tsconfig.headless.json",
     "dev": "vite",
     "preview": "vite preview",
     "test": "vitest",
@@ -63,6 +63,7 @@
   },
   "files": [
     "dist",
+    "pptb.config.json",
     "npm-shrinkwrap.json"
   ]
 }

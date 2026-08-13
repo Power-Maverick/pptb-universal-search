@@ -1,4 +1,5 @@
 import DataverseAPI from '@pptb/types/dataverseAPI';
+import { AgentLookupFilter } from '../types/agent';
 import { SearchOptions, SearchResult, SearchMode, AttributeMetadata, MetadataSearchResult, SearchCallbacks, SearchProgress, SearchCancellation } from '../types/search';
 import { metadataCache } from './MetadataCache';
 
@@ -15,7 +16,8 @@ export class UniversalSearchService {
         selectedSolution: string | null,
         searchOptions: SearchOptions,
         callbacks: SearchCallbacks,
-        cancellation: SearchCancellation
+        cancellation: SearchCancellation,
+        maxResults: number = Number.POSITIVE_INFINITY
     ): Promise<SearchResult[]> {
         this.searchStartTime = Date.now();
         
@@ -29,9 +31,9 @@ export class UniversalSearchService {
         try {
             switch (searchMode) {
                 case 'records':
-                    return await this.searchRecordsProgressive(trimmedText, selectedEntities, searchOptions, callbacks, cancellation);
+                    return await this.searchRecordsProgressive(trimmedText, selectedEntities, searchOptions, callbacks, cancellation, maxResults);
                 case 'metadata':
-                    return await this.searchMetadataProgressive(trimmedText, selectedEntities, searchOptions, callbacks, cancellation);
+                    return await this.searchMetadataProgressive(trimmedText, selectedEntities, searchOptions, callbacks, cancellation, maxResults);
                 case 'solution':
                     return await this.searchSolutionProgressive(selectedSolution, callbacks, cancellation);
                 default:
@@ -51,7 +53,8 @@ export class UniversalSearchService {
         selectedEntities: string[],
         searchOptions: SearchOptions,
         callbacks: SearchCallbacks,
-        cancellation: SearchCancellation
+        cancellation: SearchCancellation,
+        maxResults: number = Number.POSITIVE_INFINITY
     ): Promise<SearchResult[]> {
         if (!selectedEntities || selectedEntities.length === 0) {
             throw new Error('Please select at least one entity to search');
@@ -61,8 +64,14 @@ export class UniversalSearchService {
         const sortedEntities = selectedEntities.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
         const totalEntities = sortedEntities.length;
 
+        let totalMatches = 0;
+
         for (let i = 0; i < sortedEntities.length; i++) {
             if (cancellation.isCancelled) {
+                break;
+            }
+
+            if (totalMatches >= maxResults) {
                 break;
             }
 
@@ -148,7 +157,8 @@ export class UniversalSearchService {
                         entityName,
                         searchText,
                         searchableAttributes,
-                        searchOptions
+                        searchOptions,
+                        Math.max(1, maxResults - totalMatches)
                     );
                 } catch (fetchError) {
                     console.warn(`Could not build search query for entity ${entityName}:`, fetchError);
@@ -185,6 +195,10 @@ export class UniversalSearchService {
                     records = [];
                 }
 
+                if (Number.isFinite(maxResults)) {
+                    records = records.slice(0, Math.max(0, maxResults - totalMatches));
+                }
+
                 // Post-process results
                 records = await this.postProcessRecords(records);
 
@@ -206,6 +220,7 @@ export class UniversalSearchService {
                     
                     results.push(result);
                     callbacks.onResultUpdate?.(result);
+                    totalMatches += records.length;
                 }
 
             } catch (error) {
@@ -247,7 +262,8 @@ export class UniversalSearchService {
         selectedEntities: string[],
         searchOptions: SearchOptions,
         callbacks: SearchCallbacks,
-        cancellation: SearchCancellation
+        cancellation: SearchCancellation,
+        maxResults: number = Number.POSITIVE_INFINITY
     ): Promise<SearchResult[]> {
         const results: SearchResult[] = [];
         const searchRegex = this.wildcardToRegex(searchText, searchOptions.matchCase);
@@ -273,6 +289,10 @@ export class UniversalSearchService {
 
         for (let i = 0; i < entitiesToSearch.length; i++) {
             if (cancellation.isCancelled) {
+                break;
+            }
+
+            if (metadataResults.length >= maxResults) {
                 break;
             }
 
@@ -395,16 +415,22 @@ export class UniversalSearchService {
 
                 // If we found results for this entity, immediately send them to UI
                 if (entityMetadataResults.length > 0) {
+                    const remainingResults = Math.max(0, maxResults - metadataResults.length);
+                    const limitedEntityResults = entityMetadataResults.slice(0, remainingResults);
+                    if (limitedEntityResults.length === 0) {
+                        continue;
+                    }
+
                     // Add to global results
-                    metadataResults.push(...entityMetadataResults);
+                    metadataResults.push(...limitedEntityResults);
                     
                     // Create and send result immediately for progressive display
                     const result: SearchResult = {
                         id: `metadata_${entityName}`,
                         entityName,
-                        tabTitle: `${entityName} Metadata (${entityMetadataResults.length})`,
+                        tabTitle: `${entityName} Metadata (${limitedEntityResults.length})`,
                         type: 'metadata',
-                        records: entityMetadataResults.map(r => ({
+                        records: limitedEntityResults.map(r => ({
                             id: `${r.type}_${r.name}`,
                             Type: r.type,
                             Name: r.name,
@@ -414,7 +440,7 @@ export class UniversalSearchService {
                             Description: r.description || '',
                             Link: r.link || ''
                         })),
-                        totalCount: entityMetadataResults.length
+                        totalCount: limitedEntityResults.length
                     };
                     
                     results.push(result);
@@ -491,6 +517,92 @@ export class UniversalSearchService {
         return [result];
     }
 
+    async searchRecordsByLookupText(
+        searchText: string,
+        lookupFilter: AgentLookupFilter,
+        callbacks: SearchCallbacks,
+        cancellation: SearchCancellation,
+        maxResults: number = 50
+    ): Promise<SearchResult[]> {
+        if (cancellation.isCancelled) {
+            return [];
+        }
+
+        const progress: SearchProgress = {
+            currentEntity: lookupFilter.entityName,
+            entitiesCompleted: 0,
+            totalEntities: 1,
+            isSearching: true
+        };
+        callbacks.onProgress?.(progress);
+
+        try {
+            let entityMetadata = metadataCache.getEntityMetadata(lookupFilter.entityName);
+            if (!entityMetadata) {
+                const apiMetadata = await window.dataverseAPI.getEntityMetadata(lookupFilter.entityName, true, ['LogicalName', 'DisplayName']);
+                if (!apiMetadata) {
+                    throw new Error(`Could not retrieve metadata for entity ${lookupFilter.entityName}`);
+                }
+                entityMetadata = apiMetadata as any;
+            }
+
+            const attributesResponse = await window.dataverseAPI.getEntityRelatedMetadata(lookupFilter.entityName, 'Attributes');
+            const lookupAttribute = (attributesResponse?.value || []).find((attribute: any) => attribute?.LogicalName === lookupFilter.lookupAttribute);
+            if (!lookupAttribute) {
+                throw new Error(`Lookup attribute ${lookupFilter.lookupAttribute} was not found on ${lookupFilter.entityName}`);
+            }
+
+            const fetchXml = await this.buildLookupTextSearchFetchXml(
+                lookupFilter.entityName,
+                lookupAttribute,
+                searchText,
+                lookupFilter.targetEntityName,
+                lookupFilter.targetPrimaryNameAttribute,
+                maxResults
+            );
+
+            const response = await window.dataverseAPI.fetchXmlQuery(fetchXml);
+            const records = await this.postProcessRecords(Array.isArray(response?.value) ? response.value.slice(0, maxResults) : []);
+
+            if (records.length === 0) {
+                callbacks.onComplete?.([]);
+                callbacks.onProgress?.({
+                    currentEntity: '',
+                    entitiesCompleted: 1,
+                    totalEntities: 1,
+                    isSearching: false
+                });
+                return [];
+            }
+
+            const result: SearchResult = {
+                id: `records_${lookupFilter.entityName}_${lookupFilter.lookupAttribute}`,
+                entityName: lookupFilter.entityName,
+                tabTitle: `${entityMetadata?.DisplayName?.LocalizedLabels?.[0]?.Label || lookupFilter.entityName} (${records.length})`,
+                type: 'records',
+                records: records.map((record: any, index: number) => ({
+                    ...record,
+                    id: record.id || record[`${lookupFilter.entityName}id`] || `record_${index}`
+                })),
+                totalCount: records.length
+            };
+
+            callbacks.onResultUpdate?.(result);
+            callbacks.onComplete?.([result]);
+            callbacks.onProgress?.({
+                currentEntity: '',
+                entitiesCompleted: 1,
+                totalEntities: 1,
+                isSearching: false
+            });
+
+            return [result];
+        } catch (error) {
+            callbacks.onError?.(error as Error);
+            throw error;
+        }
+    }
+
     /**
      * Calculate estimated time remaining based on current progress
      */
@@ -522,7 +634,8 @@ export class UniversalSearchService {
             searchRelationships: false,
             searchFormsViews: false,
             alwaysGetLatestSolution: false
-        }
+        },
+        top: number = 100
     ): Promise<string> {
         if (!attributes || attributes.length === 0) {
             throw new Error(`No searchable attributes provided for entity ${entityName}`);
@@ -628,12 +741,55 @@ export class UniversalSearchService {
         }
         
         return `
-            <fetch top="100">
+            <fetch top="${Math.max(1, Math.min(top, 5000))}">
                 <entity name="${entityName}">
                     <all-attributes />
                     <filter type="or">
                         ${conditions.join('')}
                     </filter>
+                </entity>
+            </fetch>
+        `.trim();
+    }
+
+    private async buildLookupTextSearchFetchXml(
+        entityName: string,
+        lookupAttribute: AttributeMetadata & { Targets?: string[] },
+        searchText: string,
+        targetEntityName: string,
+        targetPrimaryNameAttribute: string,
+        top: number
+    ): Promise<string> {
+        const targets = Array.isArray(lookupAttribute.Targets) ? lookupAttribute.Targets : [];
+        if (targets.length > 0 && !targets.includes(targetEntityName)) {
+            throw new Error(`Lookup attribute ${lookupAttribute.LogicalName} does not target ${targetEntityName}`);
+        }
+
+        const targetMetadata = await window.dataverseAPI.getEntityMetadata(
+            targetEntityName,
+            true,
+            ['LogicalName', 'PrimaryIdAttribute', 'PrimaryNameAttribute']
+        ) as any;
+
+        const targetPrimaryIdAttribute = targetMetadata?.PrimaryIdAttribute || `${targetEntityName}id`;
+        const primaryNameAttribute = targetMetadata?.PrimaryNameAttribute || targetPrimaryNameAttribute;
+        const likePattern = searchText.includes('*') || searchText.includes('?')
+            ? searchText.replace(/\*/g, '%').replace(/\?/g, '_')
+            : `%${searchText}%`;
+
+        return `
+            <fetch top="${Math.max(1, Math.min(top, 5000))}">
+                <entity name="${entityName}">
+                    <all-attributes />
+                    <link-entity
+                        name="${targetEntityName}"
+                        from="${targetPrimaryIdAttribute}"
+                        to="${lookupAttribute.LogicalName}"
+                        alias="${lookupAttribute.LogicalName}_lookup">
+                        <filter type="and">
+                            <condition attribute="${primaryNameAttribute}" operator="like" value="${this.escapeXml(likePattern)}" />
+                        </filter>
+                    </link-entity>
                 </entity>
             </fetch>
         `.trim();
@@ -1117,14 +1273,9 @@ export class UniversalSearchService {
                 return '';
             }
 
-            // Parse the XML to extract ProjectHostEnvironmentId
-            const parser = new DOMParser();
-            const xmlDoc = parser.parseFromString(orgDbOrgSettings, 'text/xml');
-            
-            // Look for ProjectHostEnvironmentId in the XML
-            const environmentIdElement = xmlDoc.querySelector('ProjectHostEnvironmentId');
-            if (environmentIdElement && environmentIdElement.textContent) {
-                const environmentId = environmentIdElement.textContent.trim();
+            const environmentIdMatch = orgDbOrgSettings.match(/<ProjectHostEnvironmentId>([^<]+)<\/ProjectHostEnvironmentId>/i);
+            if (environmentIdMatch?.[1]) {
+                const environmentId = environmentIdMatch[1].trim();
                 console.log('Extracted environment ID from organization:', environmentId);
                 return environmentId;
             }
