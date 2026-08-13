@@ -24,6 +24,18 @@
                     "items": { "type": "string" },
                     "description": "Optional logical entity names to limit the search scope"
                 },
+                "lookupField": {
+                    "type": "string",
+                    "description": "Optional lookup field to search by related record primary name"
+                },
+                "lookupTargetEntity": {
+                    "type": "string",
+                    "description": "Optional target entity for lookup-field searches"
+                },
+                "lookupTargetPrimaryNameField": {
+                    "type": "string",
+                    "description": "Optional target primary-name field for lookup-field searches"
+                },
                 "maxResults": {
                     "type": "number",
                     "default": 50

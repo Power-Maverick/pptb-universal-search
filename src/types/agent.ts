@@ -7,6 +7,9 @@ export interface AgentInvocationInput {
     entities?: string[];
     maxResults?: number;
     matchCase?: boolean;
+    lookupField?: string;
+    lookupTargetEntity?: string;
+    lookupTargetPrimaryNameField?: string;
 }
 
 export interface AgentLookupFilter {

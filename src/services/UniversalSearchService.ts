@@ -201,6 +201,7 @@ export class UniversalSearchService {
 
                 // Post-process results
                 records = await this.postProcessRecords(records);
+                totalMatches += records.length;
 
                 // Only create result if we have records or want to show empty results
                 if (records.length > 0) {
@@ -217,10 +218,9 @@ export class UniversalSearchService {
                         records: recordsWithId,
                         totalCount: records.length
                     };
-                    
                     results.push(result);
                     callbacks.onResultUpdate?.(result);
-                    totalMatches += records.length;
+                    callbacks.onResultUpdate?.(result);
                 }
 
             } catch (error) {
@@ -671,11 +671,11 @@ export class UniversalSearchService {
                 case 'Memo':
                     if (searchText.includes('*') || searchText.includes('?')) {
                         // Use like with wildcards
-                        const likePattern = searchText.replace(/\*/g, '%').replace(/\?/g, '_');
+                        const likePattern = this.buildLikePattern(searchText, true);
                         conditions.push(`<condition attribute="${attrName}" operator="like" value="${this.escapeXml(likePattern)}" />`);
                     } else {
                         // Use contains for regular text
-                        conditions.push(`<condition attribute="${attrName}" operator="like" value="%${this.escapeXml(searchText)}%" />`);
+                        conditions.push(`<condition attribute="${attrName}" operator="like" value="${this.escapeXml(this.buildLikePattern(searchText))}" />`);
                     }
                     break;
                     
@@ -774,9 +774,7 @@ export class UniversalSearchService {
 
         const targetPrimaryIdAttribute = targetMetadata?.PrimaryIdAttribute || `${targetEntityName}id`;
         const primaryNameAttribute = targetMetadata?.PrimaryNameAttribute || targetPrimaryNameAttribute;
-        const likePattern = searchText.includes('*') || searchText.includes('?')
-            ? searchText.replace(/\*/g, '%').replace(/\?/g, '_')
-            : `%${searchText}%`;
+        const likePattern = this.buildLikePattern(searchText, searchText.includes('*') || searchText.includes('?'));
 
         return `
             <fetch top="${Math.max(1, Math.min(top, 5000))}">
@@ -806,6 +804,16 @@ export class UniversalSearchService {
         // In a full implementation, this would resolve lookup display names
         // and option set labels for better display
         return records;
+    }
+
+    private buildLikePattern(searchText: string, preserveWildcards: boolean = false): string {
+        const normalizedText = preserveWildcards
+            ? searchText.replace(/\*/g, '%').replace(/\?/g, '_')
+            : `%${searchText}%`;
+
+        return normalizedText
+            .replace(/\[/g, '[[]')
+            .replace(/\]/g, '[]]');
     }
 
     /**

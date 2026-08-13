@@ -115,7 +115,7 @@ export function normalizeInput(input: AgentInvocationInput): NormalizedAgentInvo
     const entities = normalizeEntities(input.entities, query, scope);
     const maxResults = normalizeMaxResults(input.maxResults);
     const matchCase = input.matchCase === true;
-    const lookupFilter = buildLookupFilter(query, entities);
+    const lookupFilter = buildLookupFilter(input, query, entities);
 
     return {
         query: query || undefined,
@@ -190,7 +190,16 @@ function extractQuotedText(query: string): string {
     return match?.[1]?.trim() ?? '';
 }
 
-function buildLookupFilter(query: string, entities: string[]) {
+function buildLookupFilter(input: AgentInvocationInput, query: string, entities: string[]) {
+    if (input.lookupField && input.lookupTargetEntity) {
+        return {
+            entityName: entities[0] || 'account',
+            lookupAttribute: input.lookupField,
+            targetEntityName: input.lookupTargetEntity,
+            targetPrimaryNameAttribute: input.lookupTargetPrimaryNameField || 'fullname'
+        };
+    }
+
     if (!/primary contact/i.test(query)) {
         return undefined;
     }
