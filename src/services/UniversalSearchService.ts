@@ -547,7 +547,8 @@ export class UniversalSearchService {
             }
 
             const attributesResponse = await window.dataverseAPI.getEntityRelatedMetadata(lookupFilter.entityName, 'Attributes');
-            const lookupAttribute = (attributesResponse?.value || []).find((attribute: any) => attribute?.LogicalName === lookupFilter.lookupAttribute);
+            const lookupAttributes = Array.isArray(attributesResponse?.value) ? attributesResponse.value : [];
+            const lookupAttribute = lookupAttributes.find((attribute: any) => attribute?.LogicalName === lookupFilter.lookupAttribute);
             if (!lookupAttribute) {
                 throw new Error(`Lookup attribute ${lookupFilter.lookupAttribute} was not found on ${lookupFilter.entityName}`);
             }

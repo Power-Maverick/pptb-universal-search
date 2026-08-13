@@ -92,7 +92,7 @@ export async function invokeHeadless(
         matches.push(...flattenSearchResults(metadataResults, normalizedInput.searchTerm, normalizedInput.matchCase));
     }
 
-    const limitedMatches = matches.slice(0, normalizedInput.maxResults);
+    const limitedMatches = deduplicateMatches(matches).slice(0, normalizedInput.maxResults);
     context.updateProgress?.(100, 'Search complete');
 
     return {
@@ -328,4 +328,25 @@ function displayFallbackContext(record: Record<string, unknown>): string {
     }
 
     return '';
+}
+
+function deduplicateMatches(matches: AgentInvocationMatch[]): AgentInvocationMatch[] {
+    const seen = new Set<string>();
+    return matches.filter((match) => {
+        const key = [
+            match.type,
+            match.entityName,
+            match.recordId,
+            match.displayName,
+            match.matchedField,
+            match.context
+        ].join('::');
+
+        if (seen.has(key)) {
+            return false;
+        }
+
+        seen.add(key);
+        return true;
+    });
 }
