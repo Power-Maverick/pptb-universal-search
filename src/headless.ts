@@ -112,7 +112,7 @@ export function normalizeInput(input: AgentInvocationInput): NormalizedAgentInvo
     }
 
     const scope = normalizeScope(input.scope, query);
-    const entities = normalizeEntities(input.entities, query, scope);
+    const entities = normalizeEntities(input.entities, query);
     const maxResults = normalizeMaxResults(input.maxResults);
     const matchCase = input.matchCase === true;
     const lookupFilter = buildLookupFilter(input, query, entities);
@@ -154,8 +154,7 @@ function normalizeScope(scope: string[] | undefined, query: string): AgentInvoca
 
 function normalizeEntities(
     entities: string[] | undefined,
-    query: string,
-    scope: AgentInvocationScope[]
+    query: string
 ): string[] {
     const normalizedEntities = Array.isArray(entities)
         ? entities.map(entity => entity.trim()).filter(Boolean)
@@ -168,10 +167,6 @@ function normalizeEntities(
     const queryEntity = query.match(/\b(?:every|all)\s+([a-z][a-z0-9_]+)/i)?.[1]?.toLowerCase();
     if (queryEntity) {
         return [queryEntity];
-    }
-
-    if (scope.length === 1 && scope[0] === 'solutionComponents') {
-        return [];
     }
 
     return [];
@@ -192,8 +187,12 @@ function extractQuotedText(query: string): string {
 
 function buildLookupFilter(input: AgentInvocationInput, query: string, entities: string[]) {
     if (input.lookupField && input.lookupTargetEntity) {
+        if (!entities[0]) {
+            throw new Error('An entity must be provided when using explicit lookupField input.');
+        }
+
         return {
-            entityName: entities[0] || 'account',
+            entityName: entities[0],
             lookupAttribute: input.lookupField,
             targetEntityName: input.lookupTargetEntity,
             targetPrimaryNameAttribute: input.lookupTargetPrimaryNameField || 'fullname'
@@ -322,11 +321,11 @@ function getMatchContext(
 
     return {
         matchedField: fallbackField,
-        context: typeof record.Description === 'string' ? record.Description : displayFallbackContext(record)
+        context: typeof record.Description === 'string' ? record.Description : getFallbackContext(record)
     };
 }
 
-function displayFallbackContext(record: Record<string, unknown>): string {
+function getFallbackContext(record: Record<string, unknown>): string {
     const firstValue = Object.values(record).find((value) => value != null);
     if (typeof firstValue === 'string') {
         return firstValue;
@@ -345,10 +344,7 @@ function deduplicateMatches(matches: AgentInvocationMatch[]): AgentInvocationMat
         const key = [
             match.type,
             match.entityName,
-            match.recordId,
-            match.displayName,
-            match.matchedField,
-            match.context
+            match.recordId || `${match.displayName}::${match.matchedField}::${match.context}`
         ].join('::');
 
         if (seen.has(key)) {

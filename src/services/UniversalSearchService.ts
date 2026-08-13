@@ -220,7 +220,6 @@ export class UniversalSearchService {
                     };
                     results.push(result);
                     callbacks.onResultUpdate?.(result);
-                    callbacks.onResultUpdate?.(result);
                 }
 
             } catch (error) {
