@@ -27,7 +27,7 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "build": "vite build && tsup --config tsup.headless.config.ts",
+    "build": "vite build && npm run build:headless",
     "build:headless": "tsup --config tsup.headless.config.ts",
     "dev": "vite",
     "preview": "vite preview",
