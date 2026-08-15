@@ -1,12 +1,12 @@
 export type AgentInvocationScope = 'records' | 'metadata' | 'solutionComponents';
+import type { SearchResult } from './search';
 
 export interface AgentInvocationInput {
-    query?: string;
     searchTerm?: string;
-    scope?: string[];
-    entities?: string[];
-    maxResults?: number;
-    matchCase?: boolean;
+    scope?: string[] | string;
+    entities?: string[] | string;
+    maxResults?: number | string;
+    matchCase?: boolean | string;
     lookupField?: string;
     lookupTargetEntity?: string;
     lookupTargetPrimaryNameField?: string;
@@ -20,7 +20,6 @@ export interface AgentLookupFilter {
 }
 
 export interface NormalizedAgentInvocationInput {
-    query?: string;
     searchTerm: string;
     scope: AgentInvocationScope[];
     entities: string[];
@@ -29,18 +28,9 @@ export interface NormalizedAgentInvocationInput {
     lookupFilter?: AgentLookupFilter;
 }
 
-export interface AgentInvocationMatch {
-    type: string;
-    entityName: string;
-    recordId: string;
-    displayName: string;
-    matchedField: string;
-    context: string;
-}
-
 export interface AgentInvocationResult {
     totalMatches: number;
-    matches: AgentInvocationMatch[];
+    results: SearchResult[];
 }
 
 export interface HeadlessInvocationContext {
@@ -50,7 +40,9 @@ export interface HeadlessInvocationContext {
     authToken?: string;
     updateProgress?: (percent: number, message: string) => void;
     logger?: {
+        debug?: (message: string) => void;
         info?: (message: string) => void;
+        warn?: (message: string) => void;
         error?: (message: string) => void;
     };
 }

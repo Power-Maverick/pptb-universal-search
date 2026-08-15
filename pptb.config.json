@@ -1,28 +1,33 @@
 {
     "invocation": {
         "version": "1.0.0",
-        "capabilities": ["dataverse-search"],
+        "capabilities": [
+            "dataverse-search"
+        ],
         "prefill": {
+            "type": "object",
             "properties": {
-                "query": {
-                    "type": "string",
-                    "description": "Natural-language agent request for Dataverse search"
-                },
                 "searchTerm": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "Required search text to run in headless execution. Example values: contoso, account, Jane."
                 },
                 "scope": {
                     "type": "array",
                     "items": {
                         "type": "string",
-                        "enum": ["records", "metadata", "solutionComponents"]
+                        "enum": [
+                            "records",
+                            "metadata",
+                            "solutionComponents"
+                        ]
                     },
-                    "default": ["records"]
+                    "default": [
+                        "records"
+                    ]
                 },
                 "entities": {
-                    "type": "array",
-                    "items": { "type": "string" },
-                    "description": "Optional logical entity names to limit the search scope"
+                    "type": "string",
+                    "description": "Optional entity filter. Supports logical names or display names, with single or comma-separated values (account,contact or Account,Contact)."
                 },
                 "lookupField": {
                     "type": "string",
@@ -47,21 +52,40 @@
             }
         },
         "returnTopic": {
+            "type": "object",
             "properties": {
                 "totalMatches": {
                     "type": "number"
                 },
-                "matches": {
+                "results": {
                     "type": "array",
                     "items": {
                         "type": "object",
                         "properties": {
-                            "type": { "type": "string" },
-                            "entityName": { "type": "string" },
-                            "recordId": { "type": "string" },
-                            "displayName": { "type": "string" },
-                            "matchedField": { "type": "string" },
-                            "context": { "type": "string" }
+                            "id": {
+                                "type": "string"
+                            },
+                            "type": {
+                                "type": "string"
+                            },
+                            "entityName": {
+                                "type": "string"
+                            },
+                            "tabTitle": {
+                                "type": "string"
+                            },
+                            "totalCount": {
+                                "type": "number"
+                            },
+                            "records": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object"
+                                }
+                            },
+                            "error": {
+                                "type": "string"
+                            }
                         }
                     }
                 }
@@ -71,12 +95,18 @@
     "agents": {
         "version": "1.0.0",
         "invokable": true,
-        "modes": ["one-way", "two-way"],
+        "modes": [
+            "one-way",
+            "two-way"
+        ],
         "defaultMode": "two-way",
-        "timeoutMS": 15000,
+        "timeoutMS": 180000,
         "headless": true,
-        "executionModes": ["windowed", "headless"],
+        "executionModes": [
+            "windowed",
+            "headless"
+        ],
         "defaultExecutionMode": "headless",
-        "headlessEntry": "dist/headless.js"
+        "headlessEntry": "dist/headless.cjs"
     }
 }
